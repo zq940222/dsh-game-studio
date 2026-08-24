@@ -10,6 +10,8 @@
  */
 import z from "@deepseek-ai/schemastery";
 import type { Context } from "@deepseek-ai/cordis";
+import * as SkillFilesystem from "@deepseek-ai/dsh-skill-filesystem";
+import { contentDir } from "./content.js";
 
 /** Cordis plugin identity. The patch row's `name` resolves to this module. */
 export const name = "game-studio";
@@ -37,7 +39,16 @@ export const Config: Schemastery<any, ConfigType> = z.object({
   watch: z.boolean().default(false),
 });
 
-export function apply(_ctx: Context, _config: ConfigType): void {
-  // Task 3 mounts the command-skill provider; Task 5 registers the
-  // orchestration skills. An empty apply keeps the row loadable meanwhile.
+export function apply(ctx: Context, config: ConfigType): void {
+  const content = contentDir();
+
+  // The human-facing studio commands. An isolated custom root: the active
+  // preset already mounts its own provider over the project and user roots,
+  // and this one must not duplicate them.
+  ctx.plugin(SkillFilesystem, {
+    providerName: "game-studio",
+    includeDefaultRoots: false,
+    watch: config.watch,
+    customSkillDirs: [`${content}skills/`],
+  });
 }
