@@ -37,21 +37,36 @@ const MARKERS: Record<string, keyof SubstitutionVars> = {
   "%%GS_REVIEW_INTENSITY%%": "reviewIntensity",
 };
 
+/**
+ * Any `%%GS_...%%` residue is a broken instruction reaching the model, not
+ * just the three markers this loader happens to know how to fill in. The
+ * charset here is deliberately wider than the known markers' own `[A-Z_]`
+ * spelling, so a lowercase, digit-bearing, or mixed-case marker name is
+ * still caught rather than shipped verbatim into the model-facing content.
+ */
+const LEFTOVER_MARKER = /%%GS_[A-Za-z0-9_]+%%/;
+
 /** Load and substitute one orchestration file. Throws on any defect. */
 export function loadOrchestrationSkill(
   fileName: string,
   text: string,
   vars: SubstitutionVars,
 ): OrchestrationSkill {
+  // Normalize line endings before any slicing so a CRLF checkout (the
+  // default on Windows with core.autocrlf=true, and this repo ships no
+  // .gitattributes) never leaves a stray \r embedded in the frontmatter or,
+  // worse, in the model-facing body.
+  const normalized = text.replace(/\r\n/g, "\n");
+
   const expected = fileName.replace(/\.md$/, "");
-  if (!text.startsWith("---")) {
+  if (!normalized.startsWith("---")) {
     throw new Error(`orchestration ${fileName}: no leading --- frontmatter block`);
   }
-  const end = text.indexOf("\n---", 3);
+  const end = normalized.indexOf("\n---", 3);
   if (end === -1) {
     throw new Error(`orchestration ${fileName}: unterminated frontmatter block`);
   }
-  const raw = text.slice(text.indexOf("\n") + 1, end + 1);
+  const raw = normalized.slice(normalized.indexOf("\n") + 1, end + 1);
   const parsed = parseYaml(raw);
   if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new Error(`orchestration ${fileName}: frontmatter is not a YAML mapping`);
@@ -68,11 +83,11 @@ export function loadOrchestrationSkill(
     throw new Error(`orchestration ${fileName}: description is missing or not a string`);
   }
 
-  let content = text.slice(end + 4).replace(/^\r?\n/, "");
+  let content = normalized.slice(end + 4).replace(/^\n/, "");
   for (const [marker, key] of Object.entries(MARKERS)) {
     content = content.split(marker).join(vars[key]);
   }
-  const leftover = /%%GS_[A-Z_]+%%/.exec(content);
+  const leftover = LEFTOVER_MARKER.exec(content);
   if (leftover !== null) {
     throw new Error(
       `orchestration ${fileName}: unsubstituted marker ${leftover[0]} would reach the model`,
