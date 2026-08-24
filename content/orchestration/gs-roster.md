@@ -14,13 +14,24 @@ context on it. Tell the child to read its own brief:
 
 ```
 subagent(
-  description: "combat damage impl",
-  prompt: "Read %%GS_CONTENT_DIR%%roles/gameplay-programmer.md and adopt that role.
-           Also read %%GS_CONTENT_DIR%%rules/gameplay-code.md.
-           Then: <the task>. Self-check against
-           %%GS_CONTENT_DIR%%handbook/review-workflow.md before reporting.",
+  description: "pillar tradeoff review",
+  prompt: "Read %%GS_CONTENT_DIR%%roles/creative-director.md and adopt
+           that role. Then: <the task>.",
   run_in_background: false)
 ```
+
+In the `standard` agent preset, the harness's `subagent` tool runs in the
+BACKGROUND by default and returns an id rather than a result, so there are
+two forms, and picking the wrong one is the most common mistake here:
+
+- **Gated or sequential** (your next step depends on the answer, as in
+  the example above — e.g. a department lead's review must pass before
+  the next stage starts): pass `run_in_background: false` explicitly and
+  wait for the result.
+- **Parallel department work** (several departments at once, e.g.
+  combat, UI, and audio in the same breath): use the default background
+  mode, keep working on other things, and collect each settlement notice
+  as it lands rather than serializing every department.
 
 ## Tiers
 
