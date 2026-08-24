@@ -1,7 +1,8 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { apply, Config, inject, name } from "../src/index.js";
 import { checkSkillRoot, contentDir } from "../src/content.js";
+import type { OrchestrationSkill } from "../src/orchestration.js";
 
 describe("plugin identity", () => {
   it("declares the cordis identity the patch row expects", () => {
@@ -48,5 +49,38 @@ describe("shipped command skills", () => {
     expect(provider!.config["includeDefaultRoots"]).toBe(false);
     expect(provider!.config["watch"]).toBe(false);
     expect(provider!.config["customSkillDirs"]).toEqual([`${contentDir()}skills/`]);
+  });
+});
+
+describe("orchestration skills", () => {
+  it("registers every shipped orchestration skill with substituted paths", () => {
+    const registered: OrchestrationSkill[] = [];
+    const ctx = {
+      plugin: () => {},
+      skills: {
+        register: (skill: OrchestrationSkill) => {
+          registered.push(skill);
+          return () => {};
+        },
+      },
+      logger: { error: () => {}, warn: () => {} },
+    } as unknown as Parameters<typeof apply>[0];
+
+    apply(ctx, new Config({ engine: "godot", reviewIntensity: "lean" }));
+
+    const names = registered.map((s) => s.name).sort();
+    expect(names).toEqual(["gs-roster", "gs-studio"]);
+    for (const skill of registered) {
+      expect(skill.content).not.toContain("%%GS_");
+      expect(skill.content).toContain(contentDir());
+      expect(skill.source).toBe("runtime");
+      expect(skill.resourceBase).toEqual({ kind: "directory", path: contentDir() });
+    }
+    expect(registered.find((s) => s.name === "gs-studio")!.content).toContain("godot");
+    expect(registered.find((s) => s.name === "gs-studio")!.content).toContain("lean");
+  });
+
+  it("ships the probe role brief the roster points at", () => {
+    expect(existsSync(`${contentDir()}roles/creative-director.md`)).toBe(true);
   });
 });

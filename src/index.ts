@@ -12,6 +12,7 @@ import z from "@deepseek-ai/schemastery";
 import type { Context } from "@deepseek-ai/cordis";
 import * as SkillFilesystem from "@deepseek-ai/dsh-skill-filesystem";
 import { contentDir } from "./content.js";
+import { loadOrchestrationDir } from "./orchestration.js";
 
 /** Cordis plugin identity. The patch row's `name` resolves to this module. */
 export const name = "game-studio";
@@ -51,4 +52,13 @@ export function apply(ctx: Context, config: ConfigType): void {
     watch: config.watch,
     customSkillDirs: [`${content}skills/`],
   });
+
+  // The model-facing half. Runtime skills rather than files, so this
+  // installation's absolute content path can be substituted into the bodies.
+  const orchestration = loadOrchestrationDir(`${content}orchestration/`, {
+    contentDir: content,
+    engine: config.engine,
+    reviewIntensity: config.reviewIntensity,
+  });
+  for (const skill of orchestration) ctx.skills.register(skill);
 }
