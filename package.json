@@ -1,0 +1,42 @@
+{
+  "name": "dsh-game-studio",
+  "version": "0.1.0",
+  "description": "A game studio for DeepSeek Harness: 49 layered roles, 73 studio commands, and a 7-phase production pipeline, ported from Claude-Code-Game-Studios",
+  "keywords": ["dsh-plugin", "deepseek-harness", "game-development", "godot", "unity", "unreal", "skills"],
+  "license": "MIT",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "exports": {
+    ".": { "types": "./lib/index.d.ts", "default": "./lib/index.js" },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": ["lib", "content", "cordis.patch.yml", "NOTICE", "LICENSE", "LICENSE.upstream", "README.md", "README.zh.md"],
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "lint:content": "node scripts/lint-content.mjs",
+    "check": "pnpm build && pnpm test && pnpm lint:content"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-skill": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-skill-filesystem": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-tool-subagent": "^0.1.0-rc.6",
+    "@deepseek-ai/schemastery": "^3.18.1"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-skill": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-skill-filesystem": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-tool-subagent": "^0.1.0-rc.6",
+    "@deepseek-ai/schemastery": "^3.18.1",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^3.0.0",
+    "yaml": "^2.5.0"
+  }
+}

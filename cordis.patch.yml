@@ -1,0 +1,9 @@
+# The dsh-game-studio bundle patch: one row inserted into the host
+# composition. The row's `name` is this package's bare specifier, which the
+# Loader resolves from the profile directory where pnpm installed it.
+#
+# A patch replaces the targeted row's whole `config`, so a profile that wants
+# to override anything here must restate every key it owns.
+- insert:
+    - id: game-studio
+      name: dsh-game-studio
