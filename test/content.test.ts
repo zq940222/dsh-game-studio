@@ -26,6 +26,17 @@ describe("checkSkillDir", () => {
     expect(problems.map((p) => p.kind)).toContain("bad-boolean");
   });
 
+  // The provider rejects THREE legacy invocation keys, not two:
+  // dsh-skill-filesystem/lib/index.js:842-844 calls
+  // rejectLegacyInvocationKey for disableModelInvocation, modelInvocable,
+  // AND userInvocable. modelInvocable is also the exact key name used
+  // inside OrchestrationSkill.invocation, so it is the one a port-script
+  // author is most likely to reach for by analogy.
+  it("catches the rejected camel-case 'modelInvocable' spelling", () => {
+    const problems = checkSkillDir("gs-modelinvocable", read("gs-modelinvocable"));
+    expect(problems.map((p) => p.kind)).toContain("bad-boolean");
+  });
+
   it("catches a missing description", () => {
     const problems = checkSkillDir("gs-x", "---\nname: gs-x\n---\n\nBody.\n");
     expect(problems.map((p) => p.kind)).toContain("missing-field");
@@ -35,6 +46,32 @@ describe("checkSkillDir", () => {
     const problems = checkSkillDir("gs-x", "no frontmatter here\n");
     expect(problems.map((p) => p.kind)).toContain("unparsable");
   });
+
+  // splitFrontmatter must require an EXACT "---" fence line, matching the
+  // provider's own parseFrontmatter/findClosingFrontmatter
+  // (dsh-skill-filesystem/lib/index.js:771-793), not merely a line that
+  // starts with "---". A "----" fence is the same silent-loss class as a
+  // missing fence: the provider drops the whole skill.
+  it("rejects a '----' opening fence that only starts with ---", () => {
+    const problems = checkSkillDir(
+      "gs-x",
+      "----\nname: gs-x\ndescription: d\n---\n\nBody.\n",
+    );
+    expect(problems.map((p) => p.kind)).toContain("unparsable");
+  });
+
+  it("rejects a '----' closing fence that only starts with ---", () => {
+    const problems = checkSkillDir(
+      "gs-x",
+      "---\nname: gs-x\ndescription: d\n----\n\nBody.\n",
+    );
+    expect(problems.map((p) => p.kind)).toContain("unparsable");
+  });
+
+  it("still accepts frontmatter fences on a CRLF checkout", () => {
+    const source = "---\r\nname: gs-x\r\ndescription: d\r\n---\r\n\r\nBody.\r\n";
+    expect(checkSkillDir("gs-x", source)).toEqual([]);
+  });
 });
 
 describe("checkSkillRoot", () => {
@@ -43,9 +80,21 @@ describe("checkSkillRoot", () => {
     // Deduplicated: gs-CamelCase and gs-badbool each produce TWO problems,
     // so compare the set of offending directories, not the problem count.
     expect([...new Set(problems.map((p) => p.dir))].sort()).toEqual(
-      ["gs-CamelCase", "gs-badbool", "gs-mismatch"].sort(),
+      ["gs-CamelCase", "gs-badbool", "gs-mismatch", "gs-modelinvocable", "gs-stray.md"].sort(),
     );
     expect(problems.some((p) => p.dir === "gs-good")).toBe(false);
+  });
+
+  // A stray content/skills/gs-foo.md from a future port tool would go
+  // unlinted and vanish silently (the provider DOES discover
+  // <root>/<name>.md as a skill: dsh-skill-filesystem/lib/index.js:583-590)
+  // if checkSkillRoot kept silently `continue`-ing past non-directory
+  // entries. It must be surfaced instead.
+  it("reports a loose .md file at the skill root instead of skipping it", () => {
+    const problems = checkSkillRoot(fixtures);
+    const stray = problems.filter((p) => p.dir === "gs-stray.md");
+    expect(stray).toHaveLength(1);
+    expect(stray[0]!.kind).toBe("loose-file");
   });
 });
 

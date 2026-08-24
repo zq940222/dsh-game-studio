@@ -74,14 +74,16 @@ export function loadOrchestrationSkill(
       `orchestration ${fileName}: frontmatter name ${JSON.stringify(declared)} must equal "${expected}"`,
     );
   }
-  const description = front["description"];
-  if (typeof description !== "string" || description.length === 0) {
+  const rawDescription = front["description"];
+  if (typeof rawDescription !== "string" || rawDescription.length === 0) {
     throw new Error(`orchestration ${fileName}: description is missing or not a string`);
   }
 
   let content = normalized.slice(end + 4).replace(/^\n/, "");
+  let description = rawDescription;
   for (const [marker, key] of Object.entries(MARKERS)) {
     content = content.split(marker).join(vars[key]);
+    description = description.split(marker).join(vars[key]);
   }
 
   // No %%GS_ prefix may remain, unconditionally — not "any prefix shaped
@@ -89,14 +91,13 @@ export function loadOrchestrationSkill(
   // a typo'd separator (hyphen, dot), a non-ASCII marker name, or an
   // unterminated marker with no closing %%. A literal substring search has
   // none of those gaps.
-  const leftoverAt = content.indexOf("%%GS_");
-  if (leftoverAt !== -1) {
-    throw new Error(
-      `orchestration ${fileName}: unsubstituted marker ${JSON.stringify(
-        content.slice(leftoverAt, leftoverAt + LEFTOVER_PREVIEW_LENGTH),
-      )} would reach the model`,
-    );
-  }
+  //
+  // description gets the identical scan, not just content: description is
+  // what sits in EVERY session's skill catalog (loaded whether or not the
+  // skill body itself is ever read), so it is the one field a leaked
+  // marker is guaranteed to be seen in.
+  assertNoLeftoverMarker(fileName, "content", content);
+  assertNoLeftoverMarker(fileName, "description", description);
 
   return {
     name: expected,
@@ -108,7 +109,24 @@ export function loadOrchestrationSkill(
   };
 }
 
-/** Load every `*.md` in one orchestration directory, sorted by name. */
+/** Throw if `%%GS_` residue survives substitution in the named field. */
+function assertNoLeftoverMarker(fileName: string, field: "content" | "description", text: string): void {
+  const leftoverAt = text.indexOf("%%GS_");
+  if (leftoverAt !== -1) {
+    throw new Error(
+      `orchestration ${fileName}: unsubstituted marker ${JSON.stringify(
+        text.slice(leftoverAt, leftoverAt + LEFTOVER_PREVIEW_LENGTH),
+      )} in ${field} would reach the model`,
+    );
+  }
+}
+
+/**
+ * Load every `*.md` in one orchestration directory, sorted by name.
+ * @param dir Absolute path to the orchestration directory, trailing
+ *   separator included — entries are joined onto it with plain string
+ *   concatenation.
+ */
 export function loadOrchestrationDir(
   dir: string,
   vars: SubstitutionVars,

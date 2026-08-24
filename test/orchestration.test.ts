@@ -47,6 +47,26 @@ describe("loadOrchestrationSkill", () => {
     expect(() => loadOrchestrationSkill("gs-probe.md", text, vars)).toThrow(/gs-probe/);
   });
 
+  // description is read at parse time and returned unmodified unless it
+  // goes through the same substitution as content — and description is
+  // what sits in EVERY session's skill catalog, so it is the one field a
+  // leaked marker is guaranteed to be seen in.
+  it("substitutes markers in the description, not just the content", () => {
+    const text =
+      "---\nname: gs-case\ndescription: Studio content at %%GS_CONTENT_DIR%% here.\n---\n\nBody.\n";
+    const skill = loadOrchestrationSkill("gs-case.md", text, vars);
+    expect(skill.description).toBe("Studio content at /abs/content/ here.");
+    expect(skill.description).not.toContain("%%GS_");
+  });
+
+  it("throws on an unsubstituted marker in the description rather than shipping it to the model", () => {
+    const text =
+      "---\nname: gs-case\ndescription: Studio content at %%GS_UNKNOWN_MARKER%% here.\n---\n\nBody.\n";
+    expect(() => loadOrchestrationSkill("gs-case.md", text, vars)).toThrow(
+      /%%GS_UNKNOWN_MARKER%%/,
+    );
+  });
+
   it("emits the registration fields the skill registry requires", () => {
     const text = readFileSync(`${fixtures}gs-probe.md`, "utf8");
     const skill = loadOrchestrationSkill("gs-probe.md", text, vars);
