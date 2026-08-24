@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import * as SkillFilesystem from "@deepseek-ai/dsh-skill-filesystem";
 import { apply, Config, inject, name } from "../src/index.js";
 import { checkSkillRoot, contentDir } from "../src/content.js";
 import type { OrchestrationSkill } from "../src/orchestration.js";
@@ -46,9 +47,29 @@ describe("shipped command skills", () => {
 
     const provider = mounted.find((m) => m.config["providerName"] === "game-studio");
     expect(provider).toBeDefined();
+    // Identity, not just the config shape: the mounted plugin must be the
+    // skill-filesystem module itself, not some other plugin that happens
+    // to accept a `providerName` option.
+    expect(provider!.plugin).toBe(SkillFilesystem);
     expect(provider!.config["includeDefaultRoots"]).toBe(false);
     expect(provider!.config["watch"]).toBe(false);
     expect(provider!.config["customSkillDirs"]).toEqual([`${contentDir()}skills/`]);
+  });
+
+  it("propagates config.watch through to the mounted provider", () => {
+    const mounted: { plugin: unknown; config: Record<string, unknown> }[] = [];
+    const ctx = {
+      plugin: (plugin: unknown, config: Record<string, unknown>) => {
+        mounted.push({ plugin, config });
+      },
+      skills: { register: () => () => {} },
+      logger: { error: () => {}, warn: () => {} },
+    } as unknown as Parameters<typeof apply>[0];
+
+    apply(ctx, new Config({ watch: true }));
+
+    const provider = mounted.find((m) => m.config["providerName"] === "game-studio");
+    expect(provider!.config["watch"]).toBe(true);
   });
 });
 

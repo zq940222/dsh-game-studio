@@ -1,7 +1,7 @@
 {
   "name": "dsh-game-studio",
   "version": "0.1.0",
-  "description": "A game studio for DeepSeek Harness: 49 layered roles, 73 studio commands, and a 7-phase production pipeline, ported from Claude-Code-Game-Studios",
+  "description": "A game studio for DeepSeek Harness: Phase 1 skeleton (skill provider, 2 orchestration skills, 1 command probe) of a port of Claude-Code-Game-Studios' 49-role, 73-command, 7-phase studio",
   "keywords": ["dsh-plugin", "deepseek-harness", "game-development", "godot", "unity", "unreal", "skills"],
   "license": "MIT",
   "engines": { "node": ">=22" },
@@ -20,7 +20,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "lint:content": "node scripts/lint-content.mjs",
-    "check": "pnpm build && pnpm test && pnpm lint:content"
+    "check": "pnpm build && pnpm test && pnpm lint:content",
+    "prepack": "pnpm build"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",

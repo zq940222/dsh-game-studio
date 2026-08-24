@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { isSkillName } from "@deepseek-ai/dsh-skill";
 import { checkSkillDir, checkSkillRoot, contentDir } from "../src/content.js";
 
 const fixtures = fileURLToPath(new URL("./fixtures/skills/", import.meta.url));
@@ -95,6 +96,40 @@ describe("checkSkillRoot", () => {
     const stray = problems.filter((p) => p.dir === "gs-stray.md");
     expect(stray).toHaveLength(1);
     expect(stray[0]!.kind).toBe("loose-file");
+  });
+});
+
+describe("KEBAB / isSkillName parity", () => {
+  // src/content.ts hand-copies the provider's kebab-case rule (KEBAB) as a
+  // regex literal rather than importing @deepseek-ai/dsh-skill (src/ has a
+  // no-@deepseek-ai-imports constraint). Nothing then ties the copy to the
+  // original, so the two can silently drift. This test does — it is
+  // allowed to import the provider's isSkillName because that constraint
+  // binds src/, not test/, and the package is already a devDependency.
+  //
+  // checkSkillDir doesn't export KEBAB itself, so parity is asserted
+  // through behavior: build a minimal well-formed skill body for each
+  // candidate name and check whether checkSkillDir raises "not-kebab" for
+  // it, exactly when the provider's own isSkillName rejects that name.
+  const wellFormed = (candidateName: string) =>
+    `---\nname: ${candidateName}\ndescription: d\ndisable-model-invocation: true\nuser-invocable: true\n---\n\nBody.\n`;
+
+  it.each([
+    "gs-good",
+    "gs-good-name",
+    "a",
+    "a1",
+    "GS-Bad",
+    "-leading",
+    "trailing-",
+    "double--hyphen",
+    "gs_underscore",
+    "",
+  ])("agrees with the provider's isSkillName for %j", (candidateName) => {
+    const rejectedAsNotKebab = checkSkillDir(candidateName, wellFormed(candidateName)).some(
+      (p) => p.kind === "not-kebab",
+    );
+    expect(rejectedAsNotKebab).toBe(!isSkillName(candidateName));
   });
 });
 
