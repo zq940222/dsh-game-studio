@@ -1,0 +1,20 @@
+dsh-game-studio
+Copyright (c) 2026 the dsh-game-studio authors
+
+This product is a derivative work of Claude-Code-Game-Studios
+(https://github.com/Donchitos/Claude-Code-Game-Studios),
+Copyright (c) 2026 Donchitos, licensed under the MIT License.
+The upstream license text is reproduced in LICENSE.upstream.
+
+Summary of changes from the upstream work:
+  - Ported from the Claude Code agent/skill/hook/rule extension points to
+    the DeepSeek Harness skill registry and subagent seam.
+  - Tool names rewritten to the harness vocabulary (Read -> read,
+    Task -> subagent, and so on).
+  - The 49 agent definitions became role briefs read by delegated
+    subagents; they are no longer named agent types.
+  - The 73 skills were renamed with a gs- prefix and marked
+    human-invocable only.
+  - The 12 hooks were NOT ported as executable hooks. The harness has no
+    pre-tool-use interception; they became checklists, approval gates, and
+    (later) reminder injection. They cannot block an action.

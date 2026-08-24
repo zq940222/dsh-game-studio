@@ -4,6 +4,7 @@
   "description": "A game studio for DeepSeek Harness: 49 layered roles, 73 studio commands, and a 7-phase production pipeline, ported from Claude-Code-Game-Studios",
   "keywords": ["dsh-plugin", "deepseek-harness", "game-development", "godot", "unity", "unreal", "skills"],
   "license": "MIT",
+  "engines": { "node": ">=22" },
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
