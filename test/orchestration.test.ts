@@ -25,11 +25,19 @@ describe("loadOrchestrationSkill", () => {
     );
   });
 
+  // The check must be a literal %%GS_ prefix scan, not a charset-bound
+  // regex — round 1 widened [A-Z_] to [A-Za-z0-9_] and that still missed a
+  // hyphen, a dot, a non-ASCII marker name, and an unterminated marker with
+  // no closing %%. Every one of these must still throw.
   it.each([
     ["lowercase", "%%GS_content_dir%%"],
     ["digit-bearing", "%%GS_ENGINE2%%"],
     ["mixed-case", "%%GS_Engine%%"],
-  ])("throws on a %s leftover marker outside the known [A-Z_] charset", (_label, marker) => {
+    ["hyphenated", "%%GS_CONTENT-DIR%%"],
+    ["dotted", "%%GS_REVIEW.INTENSITY%%"],
+    ["non-ASCII", "%%GS_引擎%%"],
+    ["unterminated", "%%GS_engine"],
+  ])("throws on a %s leftover marker with no charset or termination assumption", (_label, marker) => {
     const text = `---\nname: gs-case\ndescription: d\n---\n\nBody ${marker} end.\n`;
     expect(() => loadOrchestrationSkill("gs-case.md", text, vars)).toThrow(marker);
   });
@@ -48,7 +56,14 @@ describe("loadOrchestrationSkill", () => {
   });
 
   it("normalizes CRLF line endings so no stray \r reaches the model", () => {
-    const lf = readFileSync(`${fixtures}gs-probe.md`, "utf8");
+    // Normalize the on-disk fixture to LF *first*: on a fresh checkout on
+    // this machine (core.autocrlf=true, no .gitattributes) the fixture may
+    // already arrive as CRLF, and building the CRLF variant from un-normalized
+    // text would double up separators into \r\r\n and leave a stray \r behind
+    // — exactly the bug this test exists to catch, so the test must not
+    // reintroduce it in its own setup.
+    const onDisk = readFileSync(`${fixtures}gs-probe.md`, "utf8");
+    const lf = onDisk.replace(/\r\n/g, "\n");
     const crlf = lf.replace(/\n/g, "\r\n");
     const skill = loadOrchestrationSkill("gs-probe.md", crlf, vars);
     expect(skill.name).toBe("gs-probe");

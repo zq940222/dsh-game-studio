@@ -37,14 +37,10 @@ const MARKERS: Record<string, keyof SubstitutionVars> = {
   "%%GS_REVIEW_INTENSITY%%": "reviewIntensity",
 };
 
-/**
- * Any `%%GS_...%%` residue is a broken instruction reaching the model, not
- * just the three markers this loader happens to know how to fill in. The
- * charset here is deliberately wider than the known markers' own `[A-Z_]`
- * spelling, so a lowercase, digit-bearing, or mixed-case marker name is
- * still caught rather than shipped verbatim into the model-facing content.
- */
-const LEFTOVER_MARKER = /%%GS_[A-Za-z0-9_]+%%/;
+/** How much of the residue to quote in the thrown error — enough to name
+ *  it, short enough to stay readable, and safe even when the residue is
+ *  unterminated (no closing `%%` to anchor on). */
+const LEFTOVER_PREVIEW_LENGTH = 40;
 
 /** Load and substitute one orchestration file. Throws on any defect. */
 export function loadOrchestrationSkill(
@@ -87,10 +83,18 @@ export function loadOrchestrationSkill(
   for (const [marker, key] of Object.entries(MARKERS)) {
     content = content.split(marker).join(vars[key]);
   }
-  const leftover = LEFTOVER_MARKER.exec(content);
-  if (leftover !== null) {
+
+  // No %%GS_ prefix may remain, unconditionally — not "any prefix shaped
+  // like the three known markers." A charset-bound regex would still miss
+  // a typo'd separator (hyphen, dot), a non-ASCII marker name, or an
+  // unterminated marker with no closing %%. A literal substring search has
+  // none of those gaps.
+  const leftoverAt = content.indexOf("%%GS_");
+  if (leftoverAt !== -1) {
     throw new Error(
-      `orchestration ${fileName}: unsubstituted marker ${leftover[0]} would reach the model`,
+      `orchestration ${fileName}: unsubstituted marker ${JSON.stringify(
+        content.slice(leftoverAt, leftoverAt + LEFTOVER_PREVIEW_LENGTH),
+      )} would reach the model`,
     );
   }
 
