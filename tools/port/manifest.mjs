@@ -23,7 +23,7 @@ import { isCommand, isRole } from "./inventory.mjs";
  */
 export const EXPECTED_COUNTS = Object.freeze({
   skills: 74, roles: 49, templates: 40, rules: 11,
-  engines: 46, handbook: 13, pipeline: 2, excluded: 9,
+  engines: 46, handbook: 12, pipeline: 2, excluded: 10,
 });
 
 /**

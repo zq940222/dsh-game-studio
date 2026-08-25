@@ -86,6 +86,11 @@ export const ROLES = Object.freeze(Object.fromEntries([
 export const EXCLUDED_DOCS = Object.freeze([
   "CLAUDE-local-template.md",
   "settings-local-template.md",
+  // Claude Code setup instructions end to end (`npm install -g
+  // @anthropic-ai/claude-code`, "all hooks fail gracefully if tools are
+  // missing"). Rewriting it would produce plausible-looking setup steps for
+  // machinery this harness does not have.
+  "setup-requirements.md",
   "hooks-reference.md",
   "hooks-reference/hook-input-schemas.md",
   "hooks-reference/post-merge-asset-validation.md",

@@ -40,12 +40,13 @@ describe("inventory", () => {
     expect(byTier(1).sort()).toEqual(["creative-director", "producer", "technical-director"]);
   });
 
-  it("excludes exactly the nine Claude Code specific documents", () => {
-    expect(EXCLUDED_DOCS).toHaveLength(9);
+  it("excludes exactly the ten Claude Code specific documents", () => {
+    expect(EXCLUDED_DOCS).toHaveLength(10);
     expect(EXCLUDED_DOCS).toContain("hooks-reference.md");
     expect(EXCLUDED_DOCS).toContain("hooks-reference/pre-push-test-gate.md");
     expect(EXCLUDED_DOCS).toContain("settings-local-template.md");
     expect(EXCLUDED_DOCS).toContain("CLAUDE-local-template.md");
+    expect(EXCLUDED_DOCS).toContain("setup-requirements.md");
     expect(EXCLUDED_DOCS.filter((d) => d.startsWith("hooks-reference/"))).toHaveLength(6);
   });
 

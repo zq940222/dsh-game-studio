@@ -44,9 +44,25 @@ if (!snapshot) {
 // gs-ping and orchestration/ would still be safe (clearOwned never touches
 // them) and a correct re-run regenerates everything else, but Task 14 is
 // about to commit this output, so failing before touching disk matters.
-const snapshotSkillsDir = join(snapshot, ".claude/skills");
-if (!existsSync(snapshotSkillsDir)) {
-  console.error(`port: snapshot not found or incomplete: ${snapshotSkillsDir} does not exist`);
+//
+// All SIX source roots the port reads from are checked here, not just
+// skills/ — a snapshot containing only `.claude/skills/` used to pass this
+// guard, only for clearOwned() to wipe every other owned directory and the
+// run to then die on a raw ENOENT for `.claude/agents`, leaving a gutted
+// tree with a message that claimed the snapshot was validated. These six
+// literals must stay in sync with the six `*SrcDir` reads below.
+const SOURCE_ROOTS = [
+  ".claude/skills",
+  ".claude/agents",
+  ".claude/docs/templates",
+  ".claude/rules",
+  ".claude/docs",
+  "docs/engine-reference",
+];
+const missingRoots = SOURCE_ROOTS.map((rel) => join(snapshot, rel)).filter((abs) => !existsSync(abs));
+if (missingRoots.length > 0) {
+  console.error(`port: snapshot not found or incomplete — missing:`);
+  for (const m of missingRoots) console.error(`  ${m}`);
   process.exit(2);
 }
 
@@ -119,10 +135,9 @@ function recordBashSites(rawText, outPath) {
  *   - `.claude/docs/quick-start.md` names it by BARE FILENAME
  *     (`workflow-catalog.yaml`, inside an ASCII directory-tree listing), with
  *     no path prefix to match on. Deliberately left alone: matching a bare
- *     filename risks false-positiving on unrelated prose, and quick-start.md
- *     is already in G3's failure set for a different leftover `.claude/`
- *     line in that same tree diagram, so it is already headed to Task 15's
- *     manual review regardless of this fixup.
+ *     filename risks false-positiving on unrelated prose, and the whole
+ *     tree diagram it sits in is replaced wholesale by
+ *     {@link fixupClaudeDocResidue} below anyway.
  *
  * Uses {@link DEPTH_PREFIX} — the same lookup rewritePaths uses — rather than
  * a second hand-rolled copy, so an unrecognized `dest` fails loudly here too
@@ -142,6 +157,150 @@ function fixupPipelineRefs(text, dest) {
   const prefix = DEPTH_PREFIX[dest];
   if (prefix === void 0) throw new Error(`fixupPipelineRefs: unrecognized dest "${dest}"`);
   return text.split(PIPELINE_YAML_REF).join(`${prefix}pipeline/workflow-catalog.md`);
+}
+
+/**
+ * Literal overrides for the three files that keep their content but contain
+ * `.claude/` forms {@link PATH_MAP} structurally cannot map — a bare
+ * `.claude/` naming no specific subpath, or prose describing Claude Code's
+ * own hook/settings machinery rather than pointing at a file under it. No
+ * rewrite rule can safely generalize either shape, so each is an enumerated,
+ * auditable literal replacement, keyed by the file's ported name and applied
+ * to the RAW upstream text before any other rule runs (so a later rule can
+ * never see, and therefore can never re-corrupt, the text this substitutes
+ * in). Absent files and absent literals are both no-ops — `.split/.join` on
+ * a missing literal returns the input unchanged — so this never throws on
+ * a file it does not own.
+ *
+ * G3 is not loosened for any of these: the fix is that the content stops
+ * containing the strings, not that the gate stops checking for them.
+ * @param text - the file's raw, unmodified upstream text.
+ * @param outName - the ported file's bare name, e.g. `"quick-start.md"`.
+ * @returns text with this file's literal overrides applied, unchanged if
+ *   `outName` names none of the three.
+ */
+function fixupClaudeDocResidue(text, outName) {
+  if (outName === "directory-structure.md") {
+    // The other 17 lines are the GAME PROJECT's own layout (src/, assets/,
+    // design/, docs/, tests/, tools/, prototypes/, production/) — exactly
+    // what /gs-start scaffolds — and are worth keeping verbatim. Only this
+    // one line named the Claude Code extension-point directory; the
+    // studio's roles/commands/rules/docs ship inside the plugin instead, so
+    // there is no project-relative directory to rename it to.
+    return text.split(
+      "├── .claude/                     # Agent definitions, skills, hooks, rules, docs",
+    ).join(
+      "├── (studio roles, commands, and rules ship inside the dsh-game-studio plugin, not this project)",
+    );
+  }
+  if (outName === "quick-start.md") {
+    let out = text.split(
+      "This is a complete Claude Code agent architecture for game development. It",
+    ).join(
+      "This is a complete game-studio role and command architecture for game development, ported onto the DeepSeek Harness. It",
+    );
+    // The "## File Structure Reference" tree: everything from the bare
+    // `.claude/` line down is Claude Code's own settings.json/hooks/YAML-
+    // frontmatter storage format for the subtree that heading introduces —
+    // once the heading line is gone the indented entries beneath it have no
+    // parent to hang off, so the whole subtree is replaced as one block
+    // rather than patching the bare `.claude/` line in isolation.
+    out = out.split([
+      "CLAUDE.md                          -- Master config (read this first, ~60 lines)",
+      ".claude/",
+      "  settings.json                    -- Claude Code hooks and project settings",
+      "  agents/                          -- 49 agent definitions (YAML frontmatter)",
+      "  skills/                          -- 73 slash command definitions (YAML frontmatter)",
+      "  hooks/                           -- 12 hook scripts (.sh) wired by settings.json",
+      "  rules/                           -- 11 path-specific rule files",
+      "  docs/",
+      "    quick-start.md                 -- This file",
+      "    technical-preferences.md       -- Project-specific standards (populated by /setup-engine)",
+      "    coding-standards.md            -- Coding and design doc standards",
+      "    coordination-rules.md          -- Agent coordination rules",
+      "    context-management.md          -- Context budgets and compaction instructions",
+      "    directory-structure.md         -- Project directory layout",
+      "    workflow-catalog.yaml          -- 7-phase pipeline definition (read by /help)",
+      "    setup-requirements.md          -- System prerequisites (Git Bash, jq, Python)",
+      "    settings-local-template.md     -- Personal settings.local.json guide",
+      "    templates/                     -- 41 document templates",
+      "```",
+    ].join("\n")).join([
+      "AGENTS.md                          -- Workspace instructions (read this first)",
+      "```",
+      "",
+      "Studio roles, commands, rule files, and reference docs ship inside the",
+      "`dsh-game-studio` plugin itself, not as project files — see",
+      "`directory-structure.md` for this project's own scaffolded layout.",
+    ].join("\n"));
+    return out;
+  }
+  if (outName === "workflow-guide.md") {
+    let out = text;
+    // "Verify Hooks Are Working" describes machinery this harness does not
+    // have (pre-tool-use interception) as if it runs today; redirect to
+    // NOTICE's hook-degradation statement instead of describing a gate that
+    // does not exist.
+    out = out.split([
+      "### Step 3: Verify Hooks Are Working",
+      "",
+      "Start a new Claude Code session. You should see output from the",
+      "`session-start.sh` hook:",
+      "",
+      "```",
+      "=== Claude Code Game Studios -- Session Context ===",
+      "Branch: main",
+      "Recent commits:",
+      "  abc1234 Initial commit",
+      "===================================",
+      "```",
+      "",
+      "If you see this, hooks are working. If not, check `.claude/settings.json` to",
+      "make sure the hook paths are correct for your OS.",
+    ].join("\n")).join([
+      "### Step 3: Understand the Guardrails",
+      "",
+      "This harness has no pre-tool-use interception, so the upstream project's",
+      "validation hooks are not wired as executable gates here — see `NOTICE`",
+      "for the full mapping. What ships instead are checklists, approval",
+      "prompts, and reminders threaded through the command skills; nothing",
+      "here will stop a bad commit automatically.",
+    ].join("\n"));
+    // "Automated Hooks (Safety Net)" lists the 12 upstream shell hooks as a
+    // safety net that runs automatically. Same redirection: point at NOTICE
+    // rather than describing 12 executable gates that do not exist here.
+    out = out.split([
+      "### Automated Hooks (Safety Net)",
+      "",
+      "The system has 12 hooks that run automatically:",
+      "",
+      "| Hook | Trigger | What It Does |",
+      "|------|---------|-------------|",
+      "| `session-start.sh` | Session start | Shows branch, recent commits, detects active.md for recovery |",
+      "| `detect-gaps.sh` | Session start | Detects fresh projects (no engine, no concept) and suggests `/start` |",
+      "| `pre-compact.sh` | Before compaction | Dumps session state into conversation for auto-recovery |",
+      "| `post-compact.sh` | After compaction | Reminds Claude to restore session state from `active.md` |",
+      "| `notify.sh` | Notification event | Shows Windows toast notification via PowerShell |",
+      "| `validate-commit.sh` | Before commit | Checks for design doc references, valid JSON, no hardcoded values |",
+      "| `validate-push.sh` | Before push | Warns on pushes to main/develop |",
+      "| `validate-assets.sh` | Before commit | Checks asset naming and size |",
+      "| `validate-skill-change.sh` | Skill file written | Advises running `/skill-test` after `.claude/skills/` changes |",
+      "| `log-agent.sh` | Agent start | Logs agent invocations for audit trail |",
+      "| `log-agent-stop.sh` | Agent stop | Completes agent audit trail (start + stop) |",
+      "| `session-stop.sh` | Session end | Final session logging |",
+    ].join("\n")).join([
+      "### Automated Hooks (Safety Net)",
+      "",
+      "Upstream ran this as 12 automated shell hooks (session start/stop,",
+      "pre/post compaction, commit and push validation, agent-start logging,",
+      "and more). This harness has no pre-tool-use interception to wire them",
+      "into — see `NOTICE` for the full mapping. Equivalent coverage, where",
+      "it exists at all, comes from checklists and reminders in the command",
+      "skills themselves; none of it can block an action.",
+    ].join("\n"));
+    return out;
+  }
+  return text;
 }
 
 /** Apply the body rules in a fixed order for one destination, counting hits. */
@@ -346,7 +505,7 @@ for (const { rel, full } of walkMd(enginesSrcDir)) {
 }
 
 // 6. Handbook: .claude/docs/*.md (excluding templates/, and excluding the
-//    9-document exclusion list) -> content/handbook/*.md.
+//    10-document exclusion list) -> content/handbook/*.md.
 const docsSrcDir = join(snapshot, ".claude/docs");
 let handbookCount = 0;
 let excludedCount = 0;
@@ -360,8 +519,19 @@ for (const { rel, full } of walkMd(docsSrcDir)) {
   }
   const raw = readFileSync(full, "utf8");
   const outPath = `handbook/${rel}`;
-  recordBashSites(raw, outPath);
-  emit(outPath, rewriteBody(raw, DEST.DOC));
+  // fixupClaudeDocResidue runs BEFORE recordBashSites (unlike every other
+  // rewrite, which runs after): it deletes whole blocks rather than editing
+  // a token in place, so for the two files it touches the ledger must see
+  // the block already gone — otherwise it would report a Bash mention on a
+  // line number, and inside text, that no longer exists in the shipped
+  // file (quick-start.md's now-deleted "Git Bash, jq, Python" line, from
+  // the setup-requirements.md entry the replaced tree no longer lists). Is
+  // a no-op for every file but directory-structure.md and quick-start.md —
+  // see its doc comment for why those two keep their content but need a
+  // literal override PATH_MAP cannot express.
+  const fixedRaw = fixupClaudeDocResidue(raw, rel);
+  recordBashSites(fixedRaw, outPath);
+  emit(outPath, rewriteBody(fixedRaw, DEST.DOC));
   handbookCount++;
 }
 
@@ -371,8 +541,12 @@ recordBashSites(catalogRaw, "pipeline/workflow-catalog.md");
 emit("pipeline/workflow-catalog.md", rewriteBody(renderWorkflowCatalog(catalogRaw), DEST.DOC));
 
 const guideRaw = readFileSync(join(snapshot, "docs/WORKFLOW-GUIDE.md"), "utf8");
-recordBashSites(guideRaw, "pipeline/workflow-guide.md");
-emit("pipeline/workflow-guide.md", rewriteBody(guideRaw, DEST.DOC));
+// Same ordering as the handbook loop above, and for the same reason: the
+// ledger must see the hook sections already replaced, not the pre-fixup
+// text naming them.
+const fixedGuideRaw = fixupClaudeDocResidue(guideRaw, "workflow-guide.md");
+recordBashSites(fixedGuideRaw, "pipeline/workflow-guide.md");
+emit("pipeline/workflow-guide.md", rewriteBody(fixedGuideRaw, DEST.DOC));
 
 // Derived from written, not hardcoded: the two emit() calls above are the
 // only writers under pipeline/, so this is the one G4 slot that would
