@@ -76,7 +76,7 @@ Report findings before proceeding: "Environment: [engine]. Test directory:
 
 ## Phase 2: Run Automated Tests
 
-Attempt to run the test suite via Bash. Select the command based on the engine
+Attempt to run the test suite via the shell tool (`bash` on POSIX, `pwsh` on Windows). Select the command based on the engine
 detected in Phase 1:
 
 **Godot 4:**

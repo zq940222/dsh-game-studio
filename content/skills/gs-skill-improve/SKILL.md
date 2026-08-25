@@ -76,7 +76,7 @@ For each failing or warning **static** check, identify the exact gap:
 - **Check 1 fail** → which frontmatter field is missing
 - **Check 2 fail** → how many phases found vs. minimum required
 - **Check 3 fail** → no verdict keywords anywhere in the skill body
-- **Check 4 fail** → Write or Edit in allowed-tools but no ask-before-write language
+- **Check 4 fail** → the skill instructs writing or editing files but has no ask-before-write language
 - **Check 5 warn** → no follow-up or next-step section at the end
 - **Check 6 warn** → `context: fork` set but fewer than 5 phases found
 - **Check 7 warn** → argument-hint is empty or doesn't match documented modes

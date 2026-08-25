@@ -80,7 +80,7 @@ three methods:
 ### Automatic verification (run without asking)
 
 - **File existence check**: `glob` for files the story said would be created.
-- **Test pass check**: if a test file path is mentioned, run it via `Bash`.
+- **Test pass check**: if a test file path is mentioned, run it via the shell tool (`bash` on POSIX, `pwsh` on Windows).
 - **No hardcoded values check**: `grep` for numeric literals in gameplay code
   paths that should be in config files.
 - **No hardcoded strings check**: `grep` for player-facing strings in `src/`

@@ -545,6 +545,161 @@ function fixupClaudeDocResidue(text, outName) {
       "Welcome to the Game Studio! Before I suggest anything, I'd like to",
     );
   }
+  // Task 15 manual review, R3 sites: these five name the bare `Bash` tool
+  // in a generic "run the test suite" instruction. Per rules.mjs' R3 doc
+  // comment, `Bash` itself is deliberately never auto-rewritten (the
+  // `standard` agent preset ships `tool-bash` on POSIX and `tool-pwsh` on
+  // win32, so a blind `Bash` -> `bash` rewrite would point Windows at a
+  // tool that does not exist there); each site gets its own literal fix
+  // naming both real tools instead. The other four R3-listed sites
+  // (gs-hotfix:74, gs-retrospective:61+64, pipeline/workflow-guide.md:39)
+  // name "Git Bash" the actual Windows shell program a human installs
+  // alongside Git, not this harness's tool, and are deliberately left
+  // untouched — see review-log.md.
+  if (outName === "gs-bug-report") {
+    return text.split(
+      "if the bug's system has a test file in `tests/`, run it via Bash and report pass/fail.",
+    ).join(
+      "if the bug's system has a test file in `tests/`, run it via the shell tool (`bash` on POSIX, `pwsh` on Windows) and report pass/fail.",
+    );
+  }
+  if (outName === "gs-gate-check") {
+    let out = text.split(
+      "- [ ] Tests are passing (run test suite via Bash)",
+    ).join(
+      "- [ ] Tests are passing (run test suite via the shell tool — `bash` on POSIX, `pwsh` on Windows)",
+    );
+    out = out.split(
+      "- For test checks: Run the test suite via `Bash` if a test runner is configured",
+    ).join(
+      "- For test checks: Run the test suite via the shell tool (`bash` on POSIX, `pwsh` on Windows) if a test runner is configured",
+    );
+    // Delegation-idiom nit (charter item 2): the generic "via Task" -> "via
+    // a subagent" rewrite (TASK_DELEGATION_PHRASES in rules.mjs) turns this
+    // sentence into "...as **parallel subagents** via a subagent using...",
+    // a plural noun bumping into the singular article the rule inserts.
+    // Fixed here by dropping "via Task" outright — "as **parallel
+    // subagents**" already names the mechanism, and the very next sentence
+    // ("Issue all four Task calls simultaneously") still carries the
+    // generic rewrite to "subagent calls" untouched, so this does not
+    // duplicate or alter TASK_DELEGATION_PHRASES' own wording anywhere
+    // else in the corpus.
+    out = out.split(
+      "spawn all four directors as **parallel subagents** via Task using the parallel gate protocol from",
+    ).join(
+      "spawn all four directors as **parallel subagents** using the parallel gate protocol from",
+    );
+    return out;
+  }
+  if (outName === "gs-smoke-check") {
+    return text.split(
+      "Attempt to run the test suite via Bash. Select the command based on the engine",
+    ).join(
+      "Attempt to run the test suite via the shell tool (`bash` on POSIX, `pwsh` on Windows). Select the command based on the engine",
+    );
+  }
+  if (outName === "gs-story-done") {
+    return text.split(
+      "- **Test pass check**: if a test file path is mentioned, run it via `Bash`.",
+    ).join(
+      "- **Test pass check**: if a test file path is mentioned, run it via the shell tool (`bash` on POSIX, `pwsh` on Windows).",
+    );
+  }
+  if (outName === "gs-brainstorm") {
+    // Delegation-idiom nit (charter item 2), same shape as gs-gate-check
+    // above: "spawn BOTH X AND Y via Task in parallel" would generically
+    // become "...via a subagent in parallel", a plural pairing meeting a
+    // singular article. Dropping "via Task" and folding its meaning into
+    // "as parallel subagents" reads correctly and leaves the following
+    // "Issue both Task calls simultaneously" sentence for the generic rule
+    // to rewrite as usual.
+    return text.split(
+      "spawn BOTH `creative-director` AND `art-director` via Task in parallel before moving to Phase 5.",
+    ).join(
+      "spawn BOTH `creative-director` AND `art-director` as parallel subagents before moving to Phase 5.",
+    );
+  }
+  if (outName === "director-gates.md") {
+    // Delegation-idiom nit (charter item 2): "Spawn all [N] agents
+    // simultaneously via Task" generically becomes "...via a subagent", a
+    // placeholder plural meeting a singular article. Dropping "via Task"
+    // here leaves "issue all Task calls before waiting..." to carry the
+    // mechanism name via the generic rewrite, unchanged elsewhere.
+    return text.split(
+      "Spawn all [N] agents simultaneously via Task — issue all Task calls before",
+    ).join(
+      "Spawn all [N] agents simultaneously — issue all Task calls before",
+    );
+  }
+  // Task 15 manual review, two MORE delegation-idiom nits of the same shape
+  // as charter item 2, found while reading the five large skills and the
+  // ten random skills (gs-design-system and gs-code-review are both in that
+  // reviewed set). Same fix, same reasoning: drop "via Task" so the generic
+  // "via a subagent" rewrite never fires on a plural subject.
+  if (outName === "gs-design-system") {
+    // Two identical occurrences (Sections C and D agent-delegation
+    // callouts) share the same trailing phrase, so one split/join fixes
+    // both — verified as exactly 2 hits in the upstream file.
+    return text.split(
+      "spawn specialist agents via Task in parallel:",
+    ).join(
+      "spawn specialist agents in parallel:",
+    );
+  }
+  if (outName === "gs-code-review") {
+    return text.split(
+      "Spawn all applicable specialists simultaneously via Task — do not wait for one before starting the next.",
+    ).join(
+      "Spawn all applicable specialists simultaneously — do not wait for one before starting the next.",
+    );
+  }
+  // Task 15 manual review: gs-skill-test's own structural linter (Check 1
+  // and Check 4) requires an `allowed-tools:` frontmatter field. This
+  // harness drops that field outright during porting (SKILL_DROP in
+  // rules.mjs — a per-skill tool allowlist has no meaning here), so every
+  // one of the 73 ported skills is now GUARANTEED to fail Check 1 and can
+  // never trigger Check 4's FAIL branch correctly. Verified against
+  // gs-ping's own hand-authored frontmatter too: it already carries
+  // `name:`/`description:`/`disable-model-invocation:`/`user-invocable:`
+  // at top level, so the rewritten Check 1 field list holds for it as well
+  // — this fix does not need a second gs-ping-specific carve-out.
+  if (outName === "gs-skill-test") {
+    let out = text.split([
+      "The file must contain all of these in the YAML frontmatter block:",
+      "- `name:`",
+      "- `description:`",
+      "- `argument-hint:`",
+      "- `user-invocable:`",
+      "- `allowed-tools:`",
+      "",
+      "**FAIL** if any are absent.",
+    ].join("\n")).join([
+      "The file must contain all of these top-level YAML frontmatter keys:",
+      "- `name:`",
+      "- `description:`",
+      "- `disable-model-invocation:`",
+      "- `user-invocable:`",
+      "",
+      "**FAIL** if any are absent. (This harness has no `allowed-tools:` field —",
+      "upstream's per-skill tool allowlist is dropped during porting, not carried",
+      "into metadata, so it never appears. `argument-hint:` and other upstream",
+      "fields live inside a nested `metadata:` block instead of top-level — check",
+      "for them there, not as a sibling of `name:`.)",
+    ].join("\n"));
+    out = out.split(
+      "**FAIL** if `allowed-tools` includes `Write` or `Edit` but no ask-before-write language is found.",
+    ).join(
+      "**FAIL** if the skill's body instructs writing or editing files but no ask-before-write language is found. (There is no `allowed-tools:` field on this harness to check instead — see Check 1.)",
+    );
+    return out;
+  }
+  if (outName === "gs-skill-improve") {
+    return text.split(
+      "- **Check 4 fail** → Write or Edit in allowed-tools but no ask-before-write language",
+    ).join(
+      "- **Check 4 fail** → the skill instructs writing or editing files but has no ask-before-write language",
+    );
+  }
   return text;
 }
 

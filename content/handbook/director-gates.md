@@ -88,7 +88,7 @@ For parallel spawning (multiple directors at the same gate point):
 
 ```
 # Apply mode check for each gate first, then spawn all that survive:
-Spawn all [N] agents simultaneously via a subagent — issue all subagent calls before
+Spawn all [N] agents simultaneously — issue all subagent calls before
 waiting for any result. Collect all verdicts before proceeding.
 ```
 

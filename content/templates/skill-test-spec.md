@@ -12,7 +12,7 @@ it belongs to.]
 
 Verified automatically by `/gs-skill-test static` — no fixture needed.
 
-- [ ] Has required frontmatter fields: `name`, `description`, `argument-hint`, `user-invocable`, `allowed-tools`
+- [ ] Has required top-level frontmatter fields: `name`, `description`, `disable-model-invocation`, `user-invocable` (this harness has no `allowed-tools` field — see Check 1 in `/gs-skill-test`)
 - [ ] Has ≥2 phase headings (## Phase N or numbered ## sections)
 - [ ] Contains verdict keywords: [list the ones expected, e.g., PASS, FAIL, CONCERNS]
 - [ ] Contains "May I write" collaborative protocol language (if skill writes files)

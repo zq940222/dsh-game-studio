@@ -203,7 +203,7 @@ Repeat until the user selects [A] Lock these in.
 - `lean` → skip both (not PHASE-GATEs). Note: "CD-PILLARS skipped — Lean mode. AD-CONCEPT-VISUAL skipped — Lean mode." Proceed to Phase 5.
 - `full` → spawn as normal.
 
-**After pillars and anti-pillars are agreed, spawn BOTH `creative-director` AND `art-director` via a subagent in parallel before moving to Phase 5. Issue both subagent calls simultaneously — do not wait for one before starting the other.**
+**After pillars and anti-pillars are agreed, spawn BOTH `creative-director` AND `art-director` as parallel subagents before moving to Phase 5. Issue both subagent calls simultaneously — do not wait for one before starting the other.**
 
 - **`creative-director`** — gate **CD-PILLARS** (`../../handbook/director-gates.md`)
   Pass: full pillar set with design tests, anti-pillars, core fantasy, unique hook.

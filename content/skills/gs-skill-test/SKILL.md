@@ -45,14 +45,17 @@ If argument is missing or unrecognized, output usage and stop.
 For each skill being tested, read its `SKILL.md` fully and run all 7 checks:
 
 ### Check 1 — Required Frontmatter Fields
-The file must contain all of these in the YAML frontmatter block:
+The file must contain all of these top-level YAML frontmatter keys:
 - `name:`
 - `description:`
-- `argument-hint:`
+- `disable-model-invocation:`
 - `user-invocable:`
-- `allowed-tools:`
 
-**FAIL** if any are absent.
+**FAIL** if any are absent. (This harness has no `allowed-tools:` field —
+upstream's per-skill tool allowlist is dropped during porting, not carried
+into metadata, so it never appears. `argument-hint:` and other upstream
+fields live inside a nested `metadata:` block instead of top-level — check
+for them there, not as a sibling of `name:`.)
 
 ### Check 2 — Multiple Phases
 The skill must have ≥2 numbered phase headings. Look for patterns like:
@@ -75,7 +78,7 @@ The skill must contain ask-before-write language. Look for:
 - `"ask"` + `"write"` in close proximity (within same section)
 
 **WARN** if absent (some read-only skills legitimately skip this).
-**FAIL** if `allowed-tools` includes `write` or `edit` but no ask-before-write language is found.
+**FAIL** if the skill's body instructs writing or editing files but no ask-before-write language is found. (There is no `allowed-tools:` field on this harness to check instead — see Check 1.)
 
 ### Check 5 — Next-Step Handoff
 The skill must end with a recommended next action or follow-up path. Look for:

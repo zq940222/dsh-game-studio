@@ -214,7 +214,7 @@ A depends on B). If any cycle is detected (e.g. A→B→A, or A→B→C→A):
 - [ ] Fun hypothesis from Game Concept has been explicitly validated or revised
 
 **Quality Checks:**
-- [ ] Tests are passing (run test suite via Bash)
+- [ ] Tests are passing (run test suite via the shell tool — `bash` on POSIX, `pwsh` on Windows)
 - [ ] No critical/blocker bugs in any bug tracker or known issues
 - [ ] Core loop plays as designed (compare to GDD acceptance criteria)
 - [ ] Performance is within budget (check technical-preferences.md targets)
@@ -280,7 +280,7 @@ If a file is found, read it and check the verdict line: a FAIL verdict means the
 cross-GDD consistency check failed and must be resolved before advancing.
 
 ### Quality Checks
-- For test checks: Run the test suite via `Bash` if a test runner is configured
+- For test checks: Run the test suite via the shell tool (`bash` on POSIX, `pwsh` on Windows) if a test runner is configured
 - For design review checks: `read` the GDD and check for the 8 required sections
 - For performance checks: `read` technical-preferences.md and compare against any
   profiling data in `tests/performance/` or recent `/gs-perf-profile` output
@@ -314,7 +314,7 @@ For items that can't be automatically verified, **ask the user**:
 
 (Review mode was resolved in Phase 1. Use that stored value here.)
 
-Before generating the final verdict, spawn all four directors as **parallel subagents** via a subagent using the parallel gate protocol from `../../handbook/director-gates.md`. Issue all four subagent calls simultaneously — do not wait for one before starting the next.
+Before generating the final verdict, spawn all four directors as **parallel subagents** using the parallel gate protocol from `../../handbook/director-gates.md`. Issue all four subagent calls simultaneously — do not wait for one before starting the next.
 
 **Spawn in parallel:**
 

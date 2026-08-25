@@ -361,10 +361,10 @@ export function rewriteClaudeMd(text) {
 }
 
 /**
- * R14: literal, zero-false-positive rewrites of Claude Code's own branding
- * and model identity, wherever they recur across the corpus rather than at
- * one specific file. Each entry was checked for a false-positive population
- * before being added:
+ * R14: literal, zero-false-positive rewrites of Claude Code's own branding,
+ * model identity, and one piece of enforcement-machinery residue, wherever
+ * they recur across the corpus rather than at one specific file. Each entry
+ * was checked for a false-positive population before being added:
  *   - `Claude Code session` / `Claude session` (7 real sites, one file
  *     already excluded, one already replaced wholesale by a fixupClaudeDocResidue
  *     block) — the corpus's way of naming "a session of this assistant";
@@ -385,11 +385,40 @@ export function rewriteClaudeMd(text) {
  * block generates: that is a true, deliberate historical statement about
  * what upstream granted, not a residual leftover — see that function's own
  * doc comment.
+ *   - `"If rules/hooks flag issues, fix them and explain what was wrong"`
+ *     (35 sites — 34 role briefs sharing the "implementer" collaboration
+ *     template, plus templates/collaborative-protocols/implementation-agent-
+ *     protocol.md; Task 15 manual review, found while spot-checking 10
+ *     random role briefs) — a conditional bullet in the "Implement with
+ *     transparency" checklist. "Rules" (`content/rules/*.md`) are real on
+ *     this harness; "hooks" are not (no pre-tool-use interception — see
+ *     NOTICE), so a hook can never flag anything here. Every one of the 35
+ *     sites is this exact full sentence, unwrapped (verified by grep across
+ *     `content/`), so a whole-sentence literal has no false-positive
+ *     surface and no mid-phrase-wrap gap to worry about, unlike
+ *     TASK_DELEGATION_PHRASES' `Task\s+agents` entry.
+ *   - `templates/skill-test-spec.md`'s Static Assertions checklist item (1
+ *     site; Task 15 manual review, found via a residual grep after fixing
+ *     the same `allowed-tools` defect in gs-skill-test/gs-skill-improve —
+ *     see fixupClaudeDocResidue) names `allowed-tools` as a required
+ *     frontmatter field a spec author checks for. Templates never pass
+ *     through fixupClaudeDocResidue (see the templates loop in port.mjs),
+ *     so a per-skill literal override cannot reach this file; R14 already
+ *     runs over every destination via rewriteBody, so it is the correct
+ *     mechanism for a template-only, single-site literal like this one.
  */
 const CLAUDE_CODE_MENTIONS = Object.freeze([
   [/\bClaude(?:\s+Code)?\s+session(s?)\b/g, "session$1"],
   ["Claude's training data", "The LLM's training data"],
   ["Ask Claude to", "Ask the model to"],
+  [
+    "If rules/hooks flag issues, fix them and explain what was wrong",
+    "If rules flag issues, fix them and explain what was wrong",
+  ],
+  [
+    "- [ ] Has required frontmatter fields: `name`, `description`, `argument-hint`, `user-invocable`, `allowed-tools`",
+    "- [ ] Has required top-level frontmatter fields: `name`, `description`, `disable-model-invocation`, `user-invocable` (this harness has no `allowed-tools` field — see Check 1 in `/gs-skill-test`)",
+  ],
   // The leading article is part of the match (not just "Claude-evaluated"
   // -> "LLM-evaluated") because the one real site reads "This is a
   // Claude-evaluated reasoning check" — dropping in "LLM" alone would leave

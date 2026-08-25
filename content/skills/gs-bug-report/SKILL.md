@@ -96,7 +96,7 @@ If no argument is provided, ask the user for a bug description before proceeding
 Read `production/qa/bugs/[BUG-ID].md`. Extract the reproduction steps and expected result.
 
 1. **Re-run reproduction steps** — use grep/glob to check whether the root cause code path still exists as described. If the fix removed or changed it, note the change.
-2. **Run the related test** — if the bug's system has a test file in `tests/`, run it via Bash and report pass/fail.
+2. **Run the related test** — if the bug's system has a test file in `tests/`, run it via the shell tool (`bash` on POSIX, `pwsh` on Windows) and report pass/fail.
 3. **Check for regression** — grep the codebase for any new occurrence of the pattern that caused the bug.
 
 Produce a verification verdict:

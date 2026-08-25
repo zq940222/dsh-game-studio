@@ -465,7 +465,7 @@ This is usually the largest section. Break it into sub-sections:
 - `lean` → skip unless this is a section with HIGH implementation risk (Sections D and H only). For other sections, draft without the agent.
 - `full` → spawn as described below.
 
-**Agent delegation (MANDATORY)**: Before drafting Section C, spawn specialist agents via a subagent in parallel:
+**Agent delegation (MANDATORY)**: Before drafting Section C, spawn specialist agents in parallel:
 - Look up the system category in the routing table (Section 6 of this skill)
 - Spawn the Primary Agent AND Supporting Agent(s) listed for this category
 - Provide each agent: system name, game concept summary, pillar set, dependency GDD excerpts, the specific section being worked on
@@ -515,7 +515,7 @@ table. A formula without defined variables cannot be implemented without guesswo
 - `lean` → skip unless this is a section with HIGH implementation risk (Sections D and H only). For other sections, draft without the agent.
 - `full` → spawn as described below.
 
-**Agent delegation (MANDATORY)**: Before proposing any formulas or balance values, spawn specialist agents via a subagent in parallel:
+**Agent delegation (MANDATORY)**: Before proposing any formulas or balance values, spawn specialist agents in parallel:
 - **Always spawn `systems-designer`**: provide Core Rules from Section C, tuning goals from user, balance context from dependency GDDs. Ask them to propose formulas with variable tables and output ranges.
 - **For economy/cost systems, also spawn `economy-designer`**: provide placement costs, upgrade cost intent, and progression goals. Ask them to validate cost curves and ratios.
 - Present the specialists' proposals to the user for review via `ask_user_question`

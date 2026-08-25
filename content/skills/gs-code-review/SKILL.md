@@ -92,7 +92,7 @@ Identify the system category (engine, gameplay, AI, networking, UI, tools) and e
 
 ## Phase 7: Specialist Reviews (Parallel)
 
-Spawn all applicable specialists simultaneously via a subagent — do not wait for one before starting the next.
+Spawn all applicable specialists simultaneously — do not wait for one before starting the next.
 
 ### Engine Specialists
 

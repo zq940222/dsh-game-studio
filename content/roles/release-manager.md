@@ -38,7 +38,7 @@ Before writing any code:
 
 4. **Implement with transparency:**
    - If you encounter spec ambiguities during implementation, STOP and ask
-   - If rules/hooks flag issues, fix them and explain what was wrong
+   - If rules flag issues, fix them and explain what was wrong
    - If a deviation from the design doc is necessary (technical constraint), explicitly call it out
 
 5. **Get approval before writing files:**
