@@ -47,6 +47,73 @@ describe("G3 referential integrity", () => {
     ]);
     expect(problems.join(" ")).toContain("CLAUDE.md");
   });
+
+  // Spec §5's third G3 clause: every relative resource path resolves. Round
+  // one only implemented the first two (command exists, role exists) and
+  // never resolved a relative path at all — the review-round scan that
+  // added this clause found 3 unresolved out of 127 real corpus refs.
+  describe("clause 3: relative resource paths", () => {
+    it("passes when a markdown-link relative path resolves from the referencing file's own directory", () => {
+      const problems = checkReferentialIntegrity([
+        { path: "engines/unity/PLUGINS.md", text: "See [modules/input.md](modules/input.md)" },
+        { path: "engines/unity/modules/input.md", text: "Input System reference." },
+      ]);
+      expect(problems).toEqual([]);
+    });
+
+    it("passes when a backtick-quoted relative path resolves", () => {
+      const problems = checkReferentialIntegrity([
+        { path: "skills/gs-onboard/SKILL.md", text: "Check `../../handbook/technical-preferences.md`." },
+        { path: "handbook/technical-preferences.md", text: "Preferences." },
+      ]);
+      expect(problems).toEqual([]);
+    });
+
+    it("flags a relative reference that does not resolve, resolved from the FILE's directory not content/'s root", () => {
+      // The exact upstream-typo shape this clause was written to catch:
+      // PLUGINS.md sits at engines/unity/, so "../modules/input.md" walks
+      // out of unity/ to engines/modules/input.md — one level too far, since
+      // modules/ is a sibling of PLUGINS.md, not of unity/.
+      const problems = checkReferentialIntegrity([
+        { path: "engines/unity/PLUGINS.md", text: "See [modules/input.md](../modules/input.md)" },
+      ]);
+      expect(problems.join(" ")).toContain("../modules/input.md");
+      expect(problems.join(" ")).toContain("engines/modules/input.md");
+    });
+
+    it("does not flag the allowlisted gs-patch-notes glob-probe reference", () => {
+      // templates/patch-notes-template.md never existed upstream; the skill
+      // reaches it via a glob-and-degrade-gracefully pattern, so a miss is
+      // fine. Allowlisted explicitly rather than silently.
+      const problems = checkReferentialIntegrity([
+        {
+          path: "skills/gs-patch-notes/SKILL.md",
+          text: "glob for `../../templates/patch-notes-template.md`",
+        },
+      ]);
+      expect(problems).toEqual([]);
+    });
+
+    it("does not allowlist the same missing target from a different referencing file", () => {
+      // The allowlist key is (referencing path -> resolved path), not just
+      // the resolved path — the same broken target named from anywhere else
+      // must still fail.
+      const problems = checkReferentialIntegrity([
+        { path: "skills/gs-other/SKILL.md", text: "`../../templates/patch-notes-template.md`" },
+      ]);
+      expect(problems.join(" ")).toContain("templates/patch-notes-template.md");
+    });
+
+    it("ignores a same-directory reference with no leading ../ (out of scope, not a false negative)", () => {
+      // A bare "modules/input.md" is indistinguishable from unrelated
+      // path-shaped prose without a lot more context; this clause only
+      // resolves the unambiguous `../`-prefixed shape the real corpus uses.
+      const problems = checkReferentialIntegrity([
+        { path: "engines/unity/PLUGINS.md", text: "See `modules/does-not-exist.md`" },
+      ]);
+      expect(problems).toEqual([]);
+    });
+  });
 });
 
 describe("G4 counts", () => {

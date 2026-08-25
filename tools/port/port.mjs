@@ -24,8 +24,9 @@ import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
 import { EXCLUDED_DOCS, UPSTREAM_SHA } from "./inventory.mjs";
 import {
-  DEPTH_PREFIX, DEST, appendRoutingLine, findBashSites, rewriteClaudeCodeMentions, rewriteClaudeMd,
-  rewriteCommands, rewriteDelegation, rewritePaths, rewriteStructuredTools, rewriteUnconditionalTools,
+  DEST, appendRoutingLine, countCommandHits, findBashSites, resolveDepthPrefix, rewriteClaudeCodeMentionsCounted,
+  rewriteClaudeMd, rewriteClaudeMdCounted, rewriteCommands, rewriteDelegationCounted, rewritePathsCounted,
+  rewriteStructuredToolsCounted, rewriteUnconditionalTools, rewriteUnconditionalToolsCounted,
   transformRoleFrontmatter, transformSkillFrontmatter,
 } from "./rules.mjs";
 import { checkCounts, checkMarkerLeaks, checkReferentialIntegrity, renderManifest } from "./manifest.mjs";
@@ -71,7 +72,17 @@ if (missingRoots.length > 0) {
 const OUT = fileURLToPath(new URL("../../content/", import.meta.url));
 const MANIFEST_PATH = fileURLToPath(new URL("./manifest.md", import.meta.url));
 
-const ruleHits = { R1: 0, R2: 0, R4: 0, R5: 0, R6: 0, R7: 0, R14: 0 };
+// Every rule the port applies, R1-R14, so the manifest's rule-hit table
+// never silently omits one — the review-round finding this fixes was
+// exactly that a human cross-checking against spec §5's site counts had no
+// row to check some rules against at all. R3, R9, R10, R11, R12, and R13
+// are filled in once their own counters are known (see where each is set
+// below); their zero here is a placeholder, not a claim of zero sites.
+const ruleHits = {
+  R1: 0, R2: 0, R3: 0, R4: 0, R5: 0, "R6/R8": 0, R7: 0,
+  R9: "folded into R6/R8 — see rewritePaths' doc comment", R10: 0, R11: 0,
+  R12: "structural invariant, not a text rewrite — see the skill-loop's name≡dir comment", R13: 0, R14: 0,
+};
 const bashSites = [];
 const written = [];
 
@@ -152,23 +163,25 @@ function recordBashSites(rawText, outPath, lineDelta = 0) {
  *     tree diagram it sits in is replaced wholesale by
  *     {@link fixupClaudeDocResidue} below anyway.
  *
- * Uses {@link DEPTH_PREFIX} — the same lookup rewritePaths uses — rather than
- * a second hand-rolled copy, so an unrecognized `dest` fails loudly here too
- * instead of silently reintroducing the "../../" fallback rewritePaths was
- * just changed to reject.
+ * Uses {@link resolveDepthPrefix} — the same lookup rewritePaths uses —
+ * rather than a second hand-rolled copy, so an unrecognized `dest` fails
+ * loudly here too instead of silently reintroducing the "../../" fallback
+ * rewritePaths was already changed to reject, and so this reference gets the
+ * same per-file derived depth rewritePaths does rather than a bucket
+ * constant that can be wrong for a DOC_NESTED file three levels deep.
  *
  * Fixed up here, before rewritePaths runs, so the generic
  * `.claude/docs/` -> `handbook/` mapping never sees the literal string and
  * cannot misroute it to a file that was never written there.
  * @param text - text being rewritten for one destination.
  * @param dest - one of {@link DEST}; picks the depth prefix.
+ * @param outPath - optional; see {@link resolveDepthPrefix}.
  * @returns text with the reference redirected, unchanged if absent.
  */
 const PIPELINE_YAML_REF = ".claude/docs/workflow-catalog.yaml";
-function fixupPipelineRefs(text, dest) {
+function fixupPipelineRefs(text, dest, outPath) {
   if (!text.includes(PIPELINE_YAML_REF)) return text;
-  const prefix = DEPTH_PREFIX[dest];
-  if (prefix === void 0) throw new Error(`fixupPipelineRefs: unrecognized dest "${dest}"`);
+  const prefix = resolveDepthPrefix(dest, outPath);
   return text.split(PIPELINE_YAML_REF).join(`${prefix}pipeline/workflow-catalog.md`);
 }
 
@@ -388,6 +401,17 @@ function fixupClaudeDocResidue(text, outName) {
       "here (see `NOTICE`) — open and read `active.md` yourself at the start of a",
       "session, and write your state to it yourself before compacting.",
     ].join("\n"));
+    // Review-round finding (Important 5): same `/clear` defect as
+    // context-management.md's identical sentence — see that fixup block's
+    // comment. Matched here across the line wrap the raw upstream source
+    // uses.
+    out = out.split([
+      "checkpoint. Update it after each significant milestone. After any disruption",
+      "(compaction, crash, `/clear`), read this file first.",
+    ].join("\n")).join([
+      "checkpoint. Update it after each significant milestone. After any disruption",
+      "(compaction, crash, or starting a new session), read this file first.",
+    ].join("\n"));
     // "Compact proactively" (Final Reminders): same contradiction again,
     // for the pre-compact hook specifically.
     out = out.split([
@@ -395,7 +419,12 @@ function fixupClaudeDocResidue(text, outName) {
       "   The pre-compact hook saves your progress. Do not wait until you are at the",
       "   limit.",
     ].join("\n")).join([
-      "4. **Compact proactively.** At ~65-70% context usage, compact or `/clear`.",
+      // Review-round finding (Important 5): the TO string had carried
+      // "compact or `/clear`" through unfixed — `/clear` names a Claude
+      // Code builtin this harness does not have (inventory.mjs already
+      // classifies it as one); the FROM string above keeps it, matching
+      // upstream, but the replacement must not.
+      "4. **Compact proactively.** At ~65-70% context usage, run `/compact`.",
       "   There is no pre-compact hook to save your progress automatically (see",
       "   `NOTICE`) — write it to file yourself. Do not wait until you are at the",
       "   limit.",
@@ -520,11 +549,34 @@ function fixupClaudeDocResidue(text, outName) {
     // has no such hook (see NOTICE); step 2 already says to read the state
     // file, so step 1 becomes "go find it yourself" rather than "it finds
     // itself for you".
-    return text.split(
+    let out = text.split(
       "1. The `session-start.sh` hook will detect and preview `active.md` automatically",
     ).join(
       "1. There is no session-start hook here to do this automatically (see `NOTICE`) — check `production/session-state/active.md` yourself",
     );
+    // Review-round finding (Important 5): `/clear` names a Claude Code
+    // builtin this installed harness does not register (inventory.mjs
+    // already classifies it as one, correctly excluded from the R4
+    // whitelist) — only `/compact` exists here. Same defect class as the
+    // 86 leftover `Task` instructions R2's delegation idioms fix: the
+    // rewrite whitelist correctly refuses to touch a non-command mention,
+    // but nothing then went back to fix the PROSE that names it. Two
+    // sites, both real content this harness has no equivalent for:
+    // "disruption (compaction, crash, /clear)" becomes "a new session"
+    // (the closest real action to a full context wipe here); "Use /clear
+    // between tasks" becomes "start a new session", since this harness has
+    // no in-session context-clear distinct from compaction.
+    out = out.split(
+      "After any disruption (compaction, crash, `/clear`), read the state file first.",
+    ).join(
+      "After any disruption (compaction, crash, or starting a new session), read the state file first.",
+    );
+    out = out.split(
+      "- **Use `/clear`** between unrelated tasks, or after 2+ failed correction attempts",
+    ).join(
+      "- **Start a new session** between unrelated tasks, or after 2+ failed correction attempts — this harness has no in-session equivalent to `/clear`; `/compact` reduces context but does not reset it",
+    );
+    return out;
   }
   if (outName === "skills-reference.md") {
     // "Type `/` in Claude Code" — the one Claude-Code-specific clause in an
@@ -556,6 +608,27 @@ function fixupClaudeDocResidue(text, outName) {
   // name "Git Bash" the actual Windows shell program a human installs
   // alongside Git, not this harness's tool, and are deliberately left
   // untouched — see review-log.md.
+  if (outName === "gs-design-review") {
+    // Review-round finding (Important 5): same `/clear` defect as
+    // context-management.md/workflow-guide.md's identical-in-kind
+    // sentences — see the context-management.md fixup block's comment.
+    // Matched pre-R4 (bare `/design-review`, not yet `/gs-design-review`),
+    // same as every other fixupClaudeDocResidue block that names a command.
+    let out = text.split(
+      "- Note current context usage: if context is above ~50%, add: \"(Recommended: /clear before re-review — this session has used X% context. A full re-review runs 5 agents and needs clean context.)\"",
+    ).join(
+      "- Note current context usage: if context is above ~50%, add: \"(Recommended: start a new session before re-review — this session has used X% context. A full re-review runs 5 agents and needs clean context.)\"",
+    );
+    out = out.split(
+      "  - `[A] Re-review in a new session — run /design-review [doc-path] after /clear`",
+    ).join(
+      // "in a new session" already says what "after /clear" was trying to
+      // add — this harness has no /clear to add it with, and the phrase
+      // was redundant even upstream, so dropped rather than reworded.
+      "  - `[A] Re-review in a new session — run /design-review [doc-path]`",
+    );
+    return out;
+  }
   if (outName === "gs-bug-report") {
     return text.split(
       "if the bug's system has a test file in `tests/`, run it via Bash and report pass/fail.",
@@ -817,19 +890,54 @@ function fixupClaudeDocResidue(text, outName) {
       "6. producer           -- Sprint retrospective with /retrospective",
     );
   }
+  if (outName === "unity/PLUGINS.md") {
+    // Review-round finding (Important 1, G3 clause 3): upstream typo, not a
+    // rewrite artifact — the link TEXT (`modules/input.md`) already names
+    // the correct same-directory target; only the destination carries a
+    // spurious `../` that walks one level too far (to `content/engines/`,
+    // where nothing lives). Two literal fixes, same file.
+    let out = text.split("[modules/input.md](../modules/input.md)").join(
+      "[modules/input.md](modules/input.md)",
+    );
+    out = out.split("[modules/ui.md](../modules/ui.md)").join(
+      "[modules/ui.md](modules/ui.md)",
+    );
+    return out;
+  }
   return text;
 }
 
-/** Apply the body rules in a fixed order for one destination, counting hits. */
-function rewriteBody(text, dest) {
+/**
+ * Apply the body rules in a fixed order for one destination, counting hits.
+ * @param text - the file body.
+ * @param dest - one of {@link DEST}.
+ * @param outPath - the content/-relative path this file is emitted to; passed
+ *   through to rewritePaths/fixupPipelineRefs so the `../` depth is derived
+ *   from where the file actually lives rather than a per-dest bucket
+ *   constant (see resolveDepthPrefix's doc comment). Every call site below
+ *   knows its own outPath before calling this, so there is no reason to
+ *   fall back to the bucket here.
+ */
+function rewriteBody(text, dest, outPath) {
   let out = text;
-  const b1 = out; out = rewriteUnconditionalTools(out); if (out !== b1) ruleHits.R1++;
-  const b2 = out; out = rewriteStructuredTools(out); if (out !== b2) ruleHits.R2++;
-  const b4 = out; out = rewriteCommands(out); if (out !== b4) ruleHits.R4++;
-  const b5 = out; out = rewriteDelegation(out); if (out !== b5) ruleHits.R5++;
-  const b6 = out; out = rewritePaths(fixupPipelineRefs(out, dest), dest); if (out !== b6) ruleHits.R6++;
-  const b7 = out; out = rewriteClaudeMd(out); if (out !== b7) ruleHits.R7++;
-  const b14 = out; out = rewriteClaudeCodeMentions(out); if (out !== b14) ruleHits.R14++;
+  let r;
+  r = rewriteUnconditionalToolsCounted(out); out = r.text; ruleHits.R1 += r.count;
+  r = rewriteStructuredToolsCounted(out); out = r.text; ruleHits.R2 += r.count;
+  // R4 (rewriteCommands) has no *Counted variant of its own — countCommandHits
+  // already exists as its counting companion (see rules.mjs), measured
+  // against the text BEFORE the rewrite the same way every other counter
+  // here measures against its own step's input.
+  ruleHits.R4 += countCommandHits(out);
+  out = rewriteCommands(out);
+  r = rewriteDelegationCounted(out); out = r.text; ruleHits.R5 += r.count;
+  // fixupPipelineRefs' own PIPELINE_YAML_REF site (when present) is folded
+  // into the same R6/R8 bucket conceptually but not counted below — a rare
+  // (3-site) redirect handled before rewritePathsCounted runs, so it never
+  // shows up in that count. Known, accepted gap.
+  out = fixupPipelineRefs(out, dest, outPath);
+  r = rewritePathsCounted(out, dest, outPath); out = r.text; ruleHits["R6/R8"] += r.count;
+  r = rewriteClaudeMdCounted(out); out = r.text; ruleHits.R7 += r.count;
+  r = rewriteClaudeCodeMentionsCounted(out); out = r.text; ruleHits.R14 += r.count;
   return out.replace(/\r\n/g, "\n");
 }
 
@@ -960,8 +1068,8 @@ for (const name of skillNames) {
   // see recordBashSites' doc comment for why the two rarely have the same
   // line count and what that does to a body-relative line number.
   recordBashSites(raw, outPath, fmLineCount(frontmatter) - fmLineCount(rawFm));
-  let body = rewriteBody(rawBody, DEST.SKILL);
-  if (routedRole) body = appendRoutingLine(body, routedRole);
+  let body = rewriteBody(rawBody, DEST.SKILL, outPath);
+  if (routedRole) { body = appendRoutingLine(body, routedRole); ruleHits.R13++; } // R13: routing line, only where routedRole exists
   // No extra "\n" here: splitFm preserves the original blank line (if any)
   // as body's own leading newline, so inserting one more would double it.
   emit(outPath, `---\n${frontmatter}---\n${body}`);
@@ -994,7 +1102,7 @@ for (const name of roleNames) {
   // advisory's quoted upstream tool list (Read, Glob, Grep, ...) is never
   // itself rewritten — splicing it earlier would let rewriteUnconditionalTools'
   // bare \bGlob\b/\bGrep\b lowercase it into a half-migrated list.
-  let body = rewriteBody(rawBody, DEST.DOC);
+  let body = rewriteBody(rawBody, DEST.DOC, outPath);
   if (!body.endsWith("\n")) body += "\n";
   body += advisory;
   // No extra "\n" here: splitFm preserves the original blank line (if any)
@@ -1025,7 +1133,7 @@ for (const { rel, full } of walkMd(templatesSrcDir)) {
   const outPath = `templates/${rel}`;
   recordBashSites(raw, outPath);
   const dest = rel.includes("/") ? DEST.DOC_NESTED : DEST.DOC;
-  emit(outPath, rewriteBody(raw, dest));
+  emit(outPath, rewriteBody(raw, dest, outPath));
   templatesCount++;
 }
 
@@ -1036,7 +1144,7 @@ for (const f of readdirSync(rulesSrcDir).filter((f) => f.endsWith(".md")).sort()
   const raw = readFileSync(join(rulesSrcDir, f), "utf8");
   const outPath = `rules/${f}`;
   recordBashSites(raw, outPath);
-  emit(outPath, rewriteBody(raw, DEST.DOC));
+  emit(outPath, rewriteBody(raw, DEST.DOC, outPath));
   rulesCount++;
 }
 
@@ -1046,8 +1154,14 @@ let enginesCount = 0;
 for (const { rel, full } of walkMd(enginesSrcDir)) {
   const raw = readFileSync(full, "utf8");
   const outPath = `engines/${rel}`;
-  recordBashSites(raw, outPath);
-  emit(outPath, rewriteBody(raw, DEST.DOC_NESTED));
+  // fixupClaudeDocResidue runs BEFORE recordBashSites, same reasoning as
+  // the handbook and skills loops: for the one engine doc it touches
+  // (unity/PLUGINS.md) it only corrects two link targets, not a
+  // Bash-mentioning line, but the ordering is kept consistent everywhere
+  // this function is called rather than being case-by-case.
+  const fixedRaw = fixupClaudeDocResidue(raw, rel);
+  recordBashSites(fixedRaw, outPath);
+  emit(outPath, rewriteBody(fixedRaw, DEST.DOC_NESTED, outPath));
   enginesCount++;
 }
 
@@ -1078,14 +1192,14 @@ for (const { rel, full } of walkMd(docsSrcDir)) {
   // literal override PATH_MAP cannot express.
   const fixedRaw = fixupClaudeDocResidue(raw, rel);
   recordBashSites(fixedRaw, outPath);
-  emit(outPath, rewriteBody(fixedRaw, DEST.DOC));
+  emit(outPath, rewriteBody(fixedRaw, DEST.DOC, outPath));
   handbookCount++;
 }
 
 // 7. Pipeline: workflow-catalog.yaml (converted) + WORKFLOW-GUIDE.md.
 const catalogRaw = readFileSync(join(snapshot, ".claude/docs/workflow-catalog.yaml"), "utf8");
 recordBashSites(catalogRaw, "pipeline/workflow-catalog.md");
-emit("pipeline/workflow-catalog.md", rewriteBody(renderWorkflowCatalog(catalogRaw), DEST.DOC));
+emit("pipeline/workflow-catalog.md", rewriteBody(renderWorkflowCatalog(catalogRaw), DEST.DOC, "pipeline/workflow-catalog.md"));
 
 const guideRaw = readFileSync(join(snapshot, "docs/WORKFLOW-GUIDE.md"), "utf8");
 // Same ordering as the handbook loop above, and for the same reason: the
@@ -1093,7 +1207,7 @@ const guideRaw = readFileSync(join(snapshot, "docs/WORKFLOW-GUIDE.md"), "utf8");
 // text naming them.
 const fixedGuideRaw = fixupClaudeDocResidue(guideRaw, "workflow-guide.md");
 recordBashSites(fixedGuideRaw, "pipeline/workflow-guide.md");
-emit("pipeline/workflow-guide.md", rewriteBody(fixedGuideRaw, DEST.DOC));
+emit("pipeline/workflow-guide.md", rewriteBody(fixedGuideRaw, DEST.DOC, "pipeline/workflow-guide.md"));
 
 // Derived from written, not hardcoded: the two emit() calls above are the
 // only writers under pipeline/, so this is the one G4 slot that would
@@ -1104,9 +1218,10 @@ const pipelineCount = written.filter((f) => f.path.startsWith("pipeline/")).leng
 // ---------------------------------------------------------------------------
 // Gates. Every gate runs and every problem prints BEFORE any exit — a single
 // process.exit(1) per gate would make every later gate unreachable dead code
-// whenever an earlier one fails, and G3 legitimately fails on the real
-// corpus today (see the port report), so G4 and G1 must not depend on G3
-// passing to even run. Collected into one exit at the end instead. The
+// whenever an earlier one fails, and G3 has legitimately failed on the real
+// corpus before (see the port report history) and may again as content
+// grows, so G4 and G1 must not depend on G3 passing to even run. Collected
+// into one exit at the end instead. The
 // manifest write is still withheld on ANY failure — that is a separate,
 // deliberate decision: a partial manifest describing a rejected port would
 // itself be a stale artifact.
@@ -1159,6 +1274,16 @@ if (g1problems.length > 0) {
 }
 
 if (anyGateFailed) process.exit(1);
+
+// R3: every Bash mention needing manual review — bashSites is already a
+// flat one-entry-per-site ledger (not one-entry-per-file), so its length
+// IS the site count with no further reduction needed.
+ruleHits.R3 = bashSites.length;
+// R10/R11: transformSkillFrontmatter/transformRoleFrontmatter run
+// unconditionally over every skill/role file — every file IS a site, so
+// the site count is just how many files went through each transform.
+ruleHits.R10 = skillNames.length;
+ruleHits.R11 = roleNames.length;
 
 writeFileSync(MANIFEST_PATH, renderManifest({
   sha: UPSTREAM_SHA,

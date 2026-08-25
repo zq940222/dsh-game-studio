@@ -10,11 +10,34 @@
 // character preceding the slash. What the count is good for is telling
 // you when to go do that audit.
 //
-// Expected baseline: files=196 changed=151 changedLines=1265 r4Hits=1263,
-// measured against the upstream snapshot at commit 984023d. R2's slice
-// (Read/Write/Edit's backtick+phrase positions, Task's phrase-only
-// position, and the three COMPOUND_PHRASES entries in rules.mjs) was
-// audited earlier at changed=70 changedLines=94.
+// Expected baseline: files=196 changed=151 changedLines=1881 r4Hits=1263,
+// measured against the upstream snapshot at commit 984023d. `files`,
+// `changed`, and `r4Hits` are stable since the number below this one was
+// written; only `changedLines` moved, 1265 -> 1881, when Task 15 added
+// TASK_DELEGATION_PHRASES' `sub-agents spawned via Task` entry and
+// rewriteClaudeCodeMentions' new entries (the latter is not even in this
+// script's R2/R4-only scope — the `changed` file set didn't move, so the
+// growth is entirely inside files this script already counted).
+//
+// R2's slice (rewriteStructuredTools run alone, no rewriteCommands — i.e.
+// Read/Write/Edit's backtick+phrase positions, Task's phrase-only position,
+// the three COMPOUND_PHRASES entries, AND (since Task 15) the six
+// TASK_DELEGATION_PHRASES entries, all in rules.mjs) was audited earlier at
+// changed=70 changedLines=94; today it measures changed=95 changedLines=718.
+// 537 of those 718 lines are ONE file, skills/review-all-gdds/SKILL.md
+// (640 lines before, 639 after): `Task\s+agents` -> `subagents` collapses
+// its one wrapped `Task\nagents` site into a single line, and this script's
+// diff counter is a naive POSITIONAL line comparison — every line after the
+// shift point spuriously reads as "changed" until the file ends, not
+// because the content differs but because line N's content no longer sits
+// at row N. This is exactly the artifact TASK_DELEGATION_PHRASES' own doc
+// comment already predicts (`Task\s+agents` -> `subagents` "removes a
+// line"), audited here and confirmed harmless: a real per-line diff (not
+// this script's positional one) on that file shows exactly the one
+// intended edit. The remaining 718 - 537 = 181-line delta across the other
+// 94 changed files is the six TASK_DELEGATION_PHRASES entries' genuine new
+// hit population, not further audited line-by-line here since none of it
+// is a line-count-changing rewrite the way the one collapsed phrase is.
 //
 // R4's slice (1263 command hits against the whitelist in inventory.mjs)
 // was added by this task and initially measured at 1268 — 5 higher than

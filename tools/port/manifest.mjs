@@ -45,12 +45,61 @@ export function checkMarkerLeaks(files) {
 }
 
 /**
- * G3: every reference in the ported corpus must resolve.
+ * A relative-path reference this corpus actually uses: a markdown link
+ * target or a backtick-quoted bare path, starting with `../` (the
+ * unambiguous case — a same-directory reference with no `../` is
+ * indistinguishable from an unrelated path-shaped mention in prose and is
+ * deliberately not scanned here, to keep this clause free of false
+ * positives) and ending in `.md`.
+ */
+const RELATIVE_REF_RE = /(\]\(|`)(\.\.\/[\w./-]+\.md)(\)|`)/g;
+
+/**
+ * G3 clause 3's allowlist: a relative reference that is known not to
+ * resolve, and is fine anyway. Keep this explicit and reasoned rather than
+ * silently swallowing the problem in the resolver — an unexplained
+ * exemption in a gate is how the next one gets added without thought.
+ *
+ * `skills/gs-patch-notes/SKILL.md` -> `templates/patch-notes-template.md`:
+ * this template never existed upstream. The skill reaches it via "glob for
+ * X and Y … if not found, use the built-in templates instead", so a miss
+ * degrades gracefully rather than failing — see SKILL.md's Phase 2b.
+ */
+const REFERENTIAL_INTEGRITY_ALLOWLIST = new Set([
+  "skills/gs-patch-notes/SKILL.md -> templates/patch-notes-template.md",
+]);
+
+/**
+ * Resolve a `../`-relative reference against the directory of the file that
+ * contains it, POSIX-style, with `path`'s own directory as the base — NOT
+ * `content/`'s root. A reference cannot walk above `content/`: this corpus
+ * never needs to and a caller doing so is a bug, not a path to resolve, so
+ * any `..` beyond the root is simply dropped rather than going negative.
+ * @param fromPath - content/-relative path of the file containing the ref.
+ * @param ref - the reference text, e.g. `"../modules/input.md"`.
+ * @returns the resolved content/-relative path.
+ */
+function resolveRelativeRef(fromPath, ref) {
+  const stack = fromPath.split("/").slice(0, -1);
+  for (const part of ref.split("/")) {
+    if (part === "" || part === ".") continue;
+    if (part === "..") stack.pop();
+    else stack.push(part);
+  }
+  return stack.join("/");
+}
+
+/**
+ * G3: every reference in the ported corpus must resolve — spec §5's three
+ * clauses: every `/gs-x` is one of the 73 shipped commands, every routed
+ * role brief exists, and every relative resource path resolves to a real
+ * file in the port's own output.
  * @param files - the ported files, each with its content-relative path.
  * @returns one human-readable problem per broken reference.
  */
 export function checkReferentialIntegrity(files) {
   const problems = [];
+  const knownPaths = new Set(files.map((f) => f.path));
   for (const { path, text } of files) {
     for (const m of text.matchAll(/(?<![\w/-])\/(gs-[a-z0-9-]+)/g)) {
       // isCommand() on the un-prefixed name, not a separately maintained
@@ -65,6 +114,14 @@ export function checkReferentialIntegrity(files) {
       // pitfall rules.mjs documents for transformSkillFrontmatter.
       if (m[1] !== "_index" && !isRole(m[1])) {
         problems.push(`${path}: role brief does not exist: ${m[1]}`);
+      }
+    }
+    for (const m of text.matchAll(RELATIVE_REF_RE)) {
+      const ref = m[2];
+      const resolved = resolveRelativeRef(path, ref);
+      const key = `${path} -> ${resolved}`;
+      if (!knownPaths.has(resolved) && !REFERENTIAL_INTEGRITY_ALLOWLIST.has(key)) {
+        problems.push(`${path}: relative reference does not resolve: ${ref} (-> ${resolved})`);
       }
     }
     if (text.includes(".claude/")) problems.push(`${path}: leftover upstream path .claude/`);
@@ -93,6 +150,14 @@ export function checkCounts(counts) {
  *   `skillsPorted`/`skillsFirstParty` are reported alongside the `counts.skills`
  *   aggregate so a short port stays visible even when the aggregate alone
  *   would not show it (see {@link EXPECTED_COUNTS}).
+ *   `ruleHits` covers all of R1-R14 (a row per rule, never silently
+ *   omitted) and counts SITES — individual matches rewritten, the same
+ *   unit spec §5 quotes ("R7 25 处", "R8 111 处") — not files touched. A
+ *   value can be a number or an explanatory string, for the handful of
+ *   rules with no independent site count of their own: R9 (folded into
+ *   R6/R8's own rewritePaths call, no separate code) and R12 (a structural
+ *   invariant enforced by construction, not a text rewrite with match
+ *   sites). See port.mjs's `rewriteBody` for where each count comes from.
  * @returns markdown.
  */
 export function renderManifest(data) {

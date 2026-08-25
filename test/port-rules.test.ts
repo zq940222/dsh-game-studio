@@ -7,12 +7,18 @@ import {
   DEST,
   findBashSites,
   rewriteClaudeCodeMentions,
+  rewriteClaudeCodeMentionsCounted,
   rewriteClaudeMd,
+  rewriteClaudeMdCounted,
   rewriteCommands,
   rewriteDelegation,
+  rewriteDelegationCounted,
   rewritePaths,
+  rewritePathsCounted,
   rewriteStructuredTools,
+  rewriteStructuredToolsCounted,
   rewriteUnconditionalTools,
+  rewriteUnconditionalToolsCounted,
   transformRoleFrontmatter,
   transformSkillFrontmatter,
 } from "../tools/port/rules.mjs";
@@ -184,7 +190,29 @@ describe("R2 enumerated compound phrases", () => {
   });
 });
 
-describe("R2 delegation idioms (via Task / Task calls / Task agents / Task prompt / Task in this skill)", () => {
+describe("R2 delegation idioms (sub-agents spawned via Task / via Task / Task calls / Task agents / Task prompt / Task in this skill)", () => {
+  it("rewrites 'sub-agents spawned via Task' to 'sub-agents' — and MUST run before the generic 'via Task' entry", () => {
+    // Real corpus site: skills/dev-story/SKILL.md:300, one of 7 sites
+    // (Task 15 shipped this entry with no fixture — added here per the
+    // review-round finding). TASK_DELEGATION_PHRASES documents that this
+    // entry must precede the generic `via Task` entry below, or these 7
+    // sites regress to "sub-agents spawned via a subagent": nothing pinned
+    // that ordering claim before this test. It is order-sensitive by
+    // construction, not by inspection — if the generic `via Task` entry ran
+    // first, it would consume the "via Task" tail of this exact phrase
+    // (leaving "sub-agents spawned via a subagent", the wrong string below)
+    // and the specific regex would no longer find anything to match, so
+    // this assertion fails the moment the array is reordered.
+    expect(rewriteStructuredTools(
+      "all source code, test files, and evidence docs are written by sub-agents spawned via Task.",
+    )).toBe(
+      "all source code, test files, and evidence docs are written by sub-agents.",
+    );
+    expect(rewriteStructuredTools("sub-agents spawned via Task")).not.toBe(
+      "sub-agents spawned via a subagent",
+    );
+  });
+
   it("rewrites 'via Task' regardless of what follows", () => {
     // Real corpus site: skills/art-bible/SKILL.md:86.
     expect(rewriteStructuredTools("Spawn `art-director` via Task:")).toBe(
@@ -308,6 +336,18 @@ describe("R4 command names are whitelist-driven", () => {
     // a filename that does not exist: `.../gs-patch-notes.md`.
     const s = "- Patch notes go in `production/releases/[version]/patch-notes.md`";
     expect(rewriteCommands(s)).toBe(s);
+  });
+
+  it("DOES rewrite a command immediately preceded by `[` — only `]` is excluded, not `[`", () => {
+    // Real corpus site: templates/collaborative-protocols/implementation-agent-protocol.md:117.
+    // COMMAND_SLASH_RE's lookbehind excludes a preceding `]` (the `[version]`
+    // path-segment defect above) but deliberately NOT a preceding `[` — a
+    // bracketed command mention like this one is genuine and must still
+    // rewrite. Promised as a fixture in Task 9, never added until now.
+    const s = "[/story-done runs — verifies criteria, checks deviations, prompts code review, updates story status]";
+    expect(rewriteCommands(s)).toBe(
+      "[/gs-story-done runs — verifies criteria, checks deviations, prompts code review, updates story status]",
+    );
   });
 
   it("does not treat a command-shaped basename immediately followed by a file extension as a command", () => {
@@ -486,6 +526,32 @@ describe("R14 Claude Code branding and model identity", () => {
     const s = "Upstream Claude Code granted this role the configuration below.";
     expect(rewriteClaudeCodeMentions(s)).toBe(s);
   });
+
+  // Task 15's newest CLAUDE_CODE_MENTIONS entries (35 sites + 1 site) shipped
+  // with no fixture — added here per the review-round finding.
+  it("rewrites the 'If rules/hooks flag issues' bullet — 'hooks' cannot flag anything here", () => {
+    // Real corpus site: .claude/agents/accessibility-specialist.md:37, one
+    // of 34 role briefs sharing the "implementer" collaboration template,
+    // plus templates/collaborative-protocols/implementation-agent-protocol.md
+    // (35 sites total). "Rules" are real on this harness; "hooks" are not
+    // (no pre-tool-use interception — see NOTICE).
+    expect(rewriteClaudeCodeMentions(
+      "   - If rules/hooks flag issues, fix them and explain what was wrong",
+    )).toBe(
+      "   - If rules flag issues, fix them and explain what was wrong",
+    );
+  });
+
+  it("rewrites skill-test-spec.md's Static Assertions frontmatter-fields line — no allowed-tools field here", () => {
+    // Real corpus site: .claude/docs/templates/skill-test-spec.md:15 (1
+    // site). Templates never pass through fixupClaudeDocResidue, so this
+    // corpus-wide R14 literal is the only mechanism that can reach it.
+    expect(rewriteClaudeCodeMentions(
+      "- [ ] Has required frontmatter fields: `name`, `description`, `argument-hint`, `user-invocable`, `allowed-tools`",
+    )).toBe(
+      "- [ ] Has required top-level frontmatter fields: `name`, `description`, `disable-model-invocation`, `user-invocable` (this harness has no `allowed-tools` field — see Check 1 in `/gs-skill-test`)",
+    );
+  });
 });
 
 const SKILL_FM = [
@@ -654,5 +720,86 @@ describe("R10/R11 frontmatter values with embedded colons stay parseable YAML", 
     expect(() =>
       transformRoleFrontmatter("name: constructor\ndescription: d\ntools: Read\nmodel: sonnet\n", "constructor"),
     ).toThrow();
+  });
+});
+
+// Review-round finding: the manifest's ruleHits counted FILES a rule
+// touched, not SITES it rewrote, while spec §5 quotes site counts (R7
+// "25 处", R8 "111 处") — a unit mismatch that makes the manifest's own
+// cross-check false-alarm. Each *Counted variant below is a thin wrapper
+// that reuses the plain rule's own pattern table via applyCounted, so the
+// text these produce must be byte-identical to the plain rule's output —
+// verified below rather than assumed.
+describe("*Counted rule variants report sites, not files", () => {
+  it("rewriteUnconditionalToolsCounted's text matches the plain rule, count is total match sites", () => {
+    const s = "Use Glob and Grep and Glob again, then WebSearch once.";
+    const { text, count } = rewriteUnconditionalToolsCounted(s);
+    expect(text).toBe(rewriteUnconditionalTools(s));
+    expect(count).toBe(4); // Glob x2, Grep x1, WebSearch x1
+  });
+
+  it("rewriteStructuredToolsCounted counts a `sub-agents spawned via Task` site exactly once, not twice", () => {
+    // The property this rule exists to prove: TASK_DELEGATION_PHRASES'
+    // first entry's match text ("sub-agents spawned via Task") CONTAINS the
+    // second entry's pattern ("via Task"). Counting each pattern
+    // independently against the ORIGINAL text would find both and report 2
+    // sites for what is really one rewrite — applyCounted's sequential
+    // application (each pattern counted against the PREVIOUS step's
+    // output) is what keeps this at 1.
+    const s = "written by sub-agents spawned via Task.";
+    const { text, count } = rewriteStructuredToolsCounted(s);
+    expect(text).toBe(rewriteStructuredTools(s));
+    expect(text).toBe("written by sub-agents.");
+    expect(count).toBe(1);
+  });
+
+  it("rewriteStructuredToolsCounted's text matches the plain rule across tool positions, compound phrases, and delegation idioms together", () => {
+    const s = "Spawn `art-director` via Task, then issue Task calls and read `Read` results.";
+    const { text, count } = rewriteStructuredToolsCounted(s);
+    expect(text).toBe(rewriteStructuredTools(s));
+    expect(count).toBeGreaterThan(0);
+  });
+
+  it("rewriteDelegationCounted only counts sites that actually change, not the left-untouched unknown-role branch", () => {
+    const s = "`subagent_type: producer` and `subagent_type: nonexistent-role` and `subagent_type: [specialist]`";
+    const { text, count } = rewriteDelegationCounted(s);
+    expect(text).toBe(rewriteDelegation(s));
+    expect(count).toBe(2); // producer (real role) + [specialist] (placeholder) — nonexistent-role is left alone
+  });
+
+  it("rewritePathsCounted's count does not depend on dest/outPath, only which PATH_MAP sources are present", () => {
+    const s = "See .claude/agents/producer.md and .claude/rules/ai-code.md";
+    const a = rewritePathsCounted(s, DEST.SKILL, "skills/gs-x/SKILL.md");
+    const b = rewritePathsCounted(s, DEST.DOC, "handbook/x.md");
+    expect(a.count).toBe(2);
+    expect(b.count).toBe(2);
+    expect(a.text).toBe(rewritePaths(s, DEST.SKILL, "skills/gs-x/SKILL.md"));
+    expect(b.text).toBe(rewritePaths(s, DEST.DOC, "handbook/x.md"));
+  });
+
+  it("rewritePathsCounted does not double-count the longest-prefix-first overlap (.claude/docs/templates/ vs .claude/docs/)", () => {
+    // PATH_MAP lists the more specific ".claude/docs/templates/" before the
+    // general ".claude/docs/" precisely so a templates/ path is consumed by
+    // the specific entry first — the same sequential-application property
+    // rewriteStructuredToolsCounted's test above proves for
+    // TASK_DELEGATION_PHRASES. If counted independently against the
+    // original text, ".claude/docs/templates/x.md" would match BOTH
+    // entries and report 2 for what is really 1 rewritten reference.
+    const { count } = rewritePathsCounted(".claude/docs/templates/x.md", DEST.DOC, "handbook/x.md");
+    expect(count).toBe(1);
+  });
+
+  it("rewriteClaudeMdCounted counts every CLAUDE.md occurrence", () => {
+    const s = "See CLAUDE.md, then CLAUDE.md again.";
+    const { text, count } = rewriteClaudeMdCounted(s);
+    expect(text).toBe(rewriteClaudeMd(s));
+    expect(count).toBe(2);
+  });
+
+  it("rewriteClaudeCodeMentionsCounted's text matches the plain rule and counts a real corpus site", () => {
+    const s = "Context is the most critical resource in a Claude Code session.";
+    const { text, count } = rewriteClaudeCodeMentionsCounted(s);
+    expect(text).toBe(rewriteClaudeCodeMentions(s));
+    expect(count).toBe(1);
   });
 });

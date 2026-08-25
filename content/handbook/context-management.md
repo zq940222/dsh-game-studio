@@ -38,7 +38,7 @@ Task: Implement hitbox detection
 - The status line displays it as a breadcrumb: `Combat System > Melee Combat > Hitboxes`
 - Remove or empty the block when no active work focus exists
 
-After any disruption (compaction, crash, `/clear`), read the state file first.
+After any disruption (compaction, crash, or starting a new session), read the state file first.
 
 ### Incremental File Writing
 
@@ -57,7 +57,7 @@ This keeps the context window holding only the *current* section's discussion
 ## Proactive Compaction
 
 - **Compact proactively** at ~60-70% context usage, not reactively at the limit
-- **Use `/clear`** between unrelated tasks, or after 2+ failed correction attempts
+- **Start a new session** between unrelated tasks, or after 2+ failed correction attempts — this harness has no in-session equivalent to `/clear`; `/compact` reduces context but does not reset it
 - **Natural compaction points:** after writing a section to file, after committing,
   after completing a task, before starting a new topic
 - **Focused compaction:** `/compact Focus on [current task] — sections 1-3 are

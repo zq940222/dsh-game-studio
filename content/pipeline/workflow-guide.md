@@ -1242,7 +1242,7 @@ skills themselves; none of it can block an action.
 
 **Session state file:** `production/session-state/active.md` is a living
 checkpoint. Update it after each significant milestone. After any disruption
-(compaction, crash, `/clear`), read this file first.
+(compaction, crash, or starting a new session), read this file first.
 
 **Incremental writing:** When creating multi-section documents, write each
 section to file immediately after approval. This means completed sections
@@ -1648,7 +1648,7 @@ conflicts go to `producer`.
    it. The rules encode hard-won game development wisdom (data-driven values,
    delta time, accessibility, etc.).
 
-4. **Compact proactively.** At ~65-70% context usage, compact or `/clear`.
+4. **Compact proactively.** At ~65-70% context usage, run `/compact`.
    There is no pre-compact hook to save your progress automatically (see
    `NOTICE`) — write it to file yourself. Do not wait until you are at the
    limit.

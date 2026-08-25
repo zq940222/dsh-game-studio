@@ -141,39 +141,90 @@ const TASK_DELEGATION_PHRASES = Object.freeze([
   [/\bTask\s+in\s+this\s+skill\b/g, "The subagent tool in this skill"],
 ]);
 
+/**
+ * Apply a sequence of `[pattern, replacement]` pairs IN ORDER, tracking how
+ * many individual sites were replaced — not how many files/calls changed.
+ *
+ * Order-sensitive by design, the same way the rule sequences it drives are:
+ * each pattern is counted and applied against the OUTPUT of the previous
+ * step, not independently against the original text. That matters whenever
+ * one entry's match text is a substring of a later entry's pattern (e.g.
+ * TASK_DELEGATION_PHRASES' `sub-agents spawned via Task` containing the
+ * later, more generic `via Task` — counting both independently against the
+ * original text would double-count that one site). `pattern` is a global
+ * RegExp or a literal string (counted via `split().length - 1`, matching
+ * how the rule itself applies a literal via `split().join()`).
+ * @param text - the input text.
+ * @param pairs - `[pattern, replacement]` entries, same shape the rule
+ *   tables in this module already use.
+ * @returns `{ text, count }` — the rewritten text and total site count.
+ */
+function applyCounted(text, pairs) {
+  let out = text;
+  let count = 0;
+  for (const [from, to] of pairs) {
+    if (from instanceof RegExp) {
+      const matches = out.match(from);
+      if (matches) count += matches.length;
+      out = out.replace(from, to);
+    } else {
+      count += out.split(from).length - 1;
+      out = out.split(from).join(to);
+    }
+  }
+  return { text: out, count };
+}
+
+const UNCONDITIONAL_PAIRS = Object.entries(UNCONDITIONAL).map(
+  ([from, to]) => [new RegExp("\\b" + from + "\\b", "g"), to],
+);
+
+/**
+ * R1: rewrite the names that cannot collide with prose.
+ * @returns `{ text, count }` — count is the number of individual sites
+ *   rewritten (spec §5's unit), not the number of files touched.
+ */
+export function rewriteUnconditionalToolsCounted(text) {
+  return applyCounted(text, UNCONDITIONAL_PAIRS);
+}
+
 /** R1: rewrite the names that cannot collide with prose. */
 export function rewriteUnconditionalTools(text) {
-  let out = text;
-  for (const [from, to] of Object.entries(UNCONDITIONAL)) {
-    out = out.replace(new RegExp("\\b" + from + "\\b", "g"), to);
+  return rewriteUnconditionalToolsCounted(text).text;
+}
+
+/** R2: rewrite English-word tool names ONLY where the position marks them as tools. */
+const STRUCTURED_PAIRS = Object.entries(STRUCTURED).flatMap(([from, { to, positions }]) => {
+  const pairs = [];
+  if (positions.includes("backtick")) {
+    // A backtick span containing exactly the tool name and nothing else.
+    pairs.push([new RegExp("`" + from + "`", "g"), "`" + to + "`"]);
   }
-  return out;
+  if (positions.includes("phrase")) {
+    // The explicit "<Name> tool" phrase.
+    pairs.push([new RegExp("\\b" + from + " tool" + "\\b", "g"), `${to} tool`]);
+  }
+  return pairs;
+});
+
+/**
+ * R2: rewrite English-word tool names ONLY where the position marks them as
+ * tools, plus the compound phrases and Task delegation idioms folded into
+ * the same rule.
+ * @returns `{ text, count }` — see {@link applyCounted}; the three
+ *   sub-tables (STRUCTURED positions, COMPOUND_PHRASES,
+ *   TASK_DELEGATION_PHRASES) are applied in the SAME order the plain
+ *   `rewriteStructuredTools` uses, via one `applyCounted` call, so a site
+ *   double-counted or missed here is a site double-applied or missed there
+ *   too — the two can't quietly desync.
+ */
+export function rewriteStructuredToolsCounted(text) {
+  return applyCounted(text, [...STRUCTURED_PAIRS, ...COMPOUND_PHRASES, ...TASK_DELEGATION_PHRASES]);
 }
 
 /** R2: rewrite English-word tool names ONLY where the position marks them as tools. */
 export function rewriteStructuredTools(text) {
-  let out = text;
-  for (const [from, { to, positions }] of Object.entries(STRUCTURED)) {
-    if (positions.includes("backtick")) {
-      // A backtick span containing exactly the tool name and nothing else.
-      out = out.replace(new RegExp("`" + from + "`", "g"), "`" + to + "`");
-    }
-    if (positions.includes("phrase")) {
-      // The explicit "<Name> tool" phrase.
-      out = out.replace(new RegExp("\\b" + from + " tool" + "\\b", "g"), `${to} tool`);
-    }
-  }
-  // Compound phrases: exact literal substitution, no regex needed — see
-  // COMPOUND_PHRASES for why these three have no over-match surface.
-  for (const [from, to] of COMPOUND_PHRASES) {
-    out = out.split(from).join(to);
-  }
-  // Delegation idioms: see TASK_DELEGATION_PHRASES for the measured
-  // population and why each of these five needs its own line.
-  for (const [re, to] of TASK_DELEGATION_PHRASES) {
-    out = out.replace(re, to);
-  }
-  return out;
+  return rewriteStructuredToolsCounted(text).text;
 }
 
 /**
@@ -188,8 +239,16 @@ export function rewriteStructuredTools(text) {
  * roughly 91% of the raw matches (103 lines across 88 files) and drowned
  * the handful of genuine prose sites a human actually needs to review.
  * Filtered, the upstream corpus leaves 18 sites across 11 files — 4 of
- * those are "Git Bash" the shell, not the tool, and stay in the manual
- * ledger anyway rather than adding a third guess-prone skip condition.
+ * those are "Git Bash" the shell, not the tool. This rule deliberately does
+ * not add a third guess-prone skip condition to filter them out on sight;
+ * whether one survives into the port's own final manual-rewrite ledger
+ * instead depends on whether a later, file-specific fixupClaudeDocResidue
+ * override happens to touch that line for an unrelated reason. As of Task
+ * 15's manual pass only 1 of the 4 remains in the shipped ledger
+ * (`tools/port/manifest.md`, regenerated by every port run) — the other 3
+ * were incidentally resolved by unrelated literal overrides. Re-run the
+ * port and read the manifest rather than trusting this count to stay
+ * current.
  * @param text - one file's full text.
  * @returns one entry per matching prose line, 1-indexed.
  */
@@ -289,14 +348,30 @@ export function countCommandHits(text) {
  * @returns the rewritten text.
  */
 export function rewriteDelegation(text) {
-  return text.replace(/`subagent_type:\s*([^`]+)`/g, (match, raw) => {
+  return rewriteDelegationCounted(text).text;
+}
+
+/**
+ * R5, counted. A "site" is a `subagent_type:` occurrence that ACTUALLY
+ * changes (the placeholder form or a recognized role) — the "leaves an
+ * unknown role untouched" branch returns the input verbatim and is
+ * deliberately not counted, the same way an unmatched pattern anywhere
+ * else in this file contributes zero to its rule's count.
+ * @returns `{ text, count }`.
+ */
+export function rewriteDelegationCounted(text) {
+  let count = 0;
+  const out = text.replace(/`subagent_type:\s*([^`]+)`/g, (match, raw) => {
     const value = raw.trim();
     if (value.startsWith("[")) {
+      count++;
       return `a subagent for \`${value}\` (the child reads its own brief under \`roles/\`)`;
     }
     if (!isRole(value)) return match;
+    count++;
     return `delegate to \`${value}\` (the child reads \`roles/${value}.md\` itself)`;
   });
+  return { text: out, count };
 }
 
 /**
@@ -348,6 +423,45 @@ export const DEPTH_PREFIX = Object.freeze({
 });
 
 /**
+ * Resolve the `../` prefix a rewritten path should use.
+ *
+ * {@link DEPTH_PREFIX} is a per-DEST-bucket CONSTANT: it assumes every file
+ * routed through a given `dest` sits at the same depth under `content/`.
+ * That was wrong for `DEST.DOC_NESTED` the moment `engines/` started
+ * emitting three different real depths under one bucket — `engines/README.md`
+ * (1 level), `engines/<engine>/x.md` (2 levels, the case the bucket was
+ * sized for), and `engines/<engine>/modules|plugins/x.md` (3 levels, 32 of
+ * the 46 engine docs). `rewritePaths` only throws on an *unknown* dest,
+ * never a wrong-but-known one, so a bucket sized for the wrong depth is
+ * silent in exactly the way the DOC/DOC_NESTED split was created to kill —
+ * just relocated one level deeper.
+ *
+ * When `outPath` is given (the normal case — every call site already knows
+ * where its file is being emitted), the depth is derived from outPath's own
+ * nesting under `content/` instead of trusted to the bucket, so a file's
+ * prefix is always correct for where it actually lives. The bucket lookup
+ * remains as a fallback for callers that only have a `dest` (e.g. tests
+ * exercising the DEST-bucket behavior directly).
+ * @param dest - one of {@link DEST}.
+ * @param outPath - optional; the content/-relative path the file is
+ *   actually emitted to (e.g. `"engines/unity/modules/input.md"`).
+ * @returns the prefix, e.g. `"../../"` or `"%%GS_CONTENT_DIR%%"`.
+ */
+export function resolveDepthPrefix(dest, outPath) {
+  if (dest === DEST.ORCHESTRATION) return DEPTH_PREFIX[DEST.ORCHESTRATION];
+  if (outPath !== void 0) {
+    const depth = (outPath.match(/\//g) ?? []).length;
+    if (depth < 1) {
+      throw new Error(`resolveDepthPrefix: outPath "${outPath}" has no directory depth under content/`);
+    }
+    return "../".repeat(depth);
+  }
+  const prefix = DEPTH_PREFIX[dest];
+  if (prefix === void 0) throw new Error(`resolveDepthPrefix: unrecognized dest "${dest}"`);
+  return prefix;
+}
+
+/**
  * R6/R8: rewrite an upstream path to its content/ location, expressed the way
  * the destination file can actually resolve it.
  *
@@ -355,30 +469,44 @@ export const DEPTH_PREFIX = Object.freeze({
  * apply time, so they use `%%GS_CONTENT_DIR%%`. Everything else is shipped
  * VERBATIM by the filesystem provider — a marker in one of them would reach
  * the model unsubstituted with no error at all — so they use a path relative
- * to their own location, at the depth {@link DEPTH_PREFIX} declares for that
- * destination. An unrecognized `dest` throws rather than silently defaulting
- * to any one depth: a silent default previously meant "../../" for anything
- * that wasn't exactly `DEST.ORCHESTRATION` or `DEST.DOC`, which was the wrong
- * depth for a DOC-class file with nothing to catch it (the defect Task 10
- * fixed once already). Throwing means a typo'd or future dest fails loudly
- * here instead of producing a link that resolves nowhere.
+ * to their own location, at the depth {@link resolveDepthPrefix} resolves for
+ * that file. An unrecognized `dest` with no `outPath` throws rather than
+ * silently defaulting to any one depth: a silent default previously meant
+ * "../../" for anything that wasn't exactly `DEST.ORCHESTRATION` or
+ * `DEST.DOC`, which was the wrong depth for a DOC-class file with nothing to
+ * catch it (the defect Task 10 fixed once already). Throwing means a typo'd
+ * or future dest fails loudly here instead of producing a link that
+ * resolves nowhere.
  * @param text - one file's full text.
  * @param dest - one of {@link DEST}.
+ * @param outPath - optional; see {@link resolveDepthPrefix}. Every real port
+ *   call site passes it; omitted only by callers testing the DEST-bucket
+ *   fallback directly.
  * @returns the text with upstream paths redirected.
  */
-export function rewritePaths(text, dest) {
-  const prefix = DEPTH_PREFIX[dest];
-  if (prefix === void 0) throw new Error(`rewritePaths: unrecognized dest "${dest}"`);
-  let out = text;
-  for (const [from, to] of PATH_MAP) {
-    out = out.split(from).join(prefix + to);
-  }
-  return out;
+export function rewritePaths(text, dest, outPath) {
+  return rewritePathsCounted(text, dest, outPath).text;
+}
+
+/**
+ * R6/R8, counted — the count is independent of `dest`/`outPath` (they only
+ * pick the depth PREFIX substituted in, not which or how many PATH_MAP
+ * sources match), so it is the same number regardless of destination.
+ * @returns `{ text, count }`.
+ */
+export function rewritePathsCounted(text, dest, outPath) {
+  const prefix = resolveDepthPrefix(dest, outPath);
+  return applyCounted(text, PATH_MAP.map(([from, to]) => [from, prefix + to]));
 }
 
 /** R7: the workspace instruction file is `AGENTS.md` on this harness. */
 export function rewriteClaudeMd(text) {
-  return text.split("CLAUDE.md").join("AGENTS.md");
+  return rewriteClaudeMdCounted(text).text;
+}
+
+/** R7, counted. @returns `{ text, count }`. */
+export function rewriteClaudeMdCounted(text) {
+  return applyCounted(text, [["CLAUDE.md", "AGENTS.md"]]);
 }
 
 /**
@@ -457,11 +585,12 @@ const CLAUDE_CODE_MENTIONS = Object.freeze([
 ]);
 
 export function rewriteClaudeCodeMentions(text) {
-  let out = text;
-  for (const [from, to] of CLAUDE_CODE_MENTIONS) {
-    out = from instanceof RegExp ? out.replace(from, to) : out.split(from).join(to);
-  }
-  return out;
+  return rewriteClaudeCodeMentionsCounted(text).text;
+}
+
+/** R14, counted. @returns `{ text, count }`. */
+export function rewriteClaudeCodeMentionsCounted(text) {
+  return applyCounted(text, CLAUDE_CODE_MENTIONS);
 }
 
 /** Keys that survive as top-level skill frontmatter; everything else folds into metadata. */
