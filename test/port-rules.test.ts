@@ -1,7 +1,9 @@
 import { posix } from "node:path";
 import { describe, expect, it } from "vitest";
+import { parse as parseYaml } from "yaml";
 import { COMMANDS, EXCLUDED_DOCS, ROLES, UPSTREAM_SHA, isCommand, isRole } from "../tools/port/inventory.mjs";
 import {
+  appendRoutingLine,
   DEST,
   findBashSites,
   rewriteClaudeMd,
@@ -10,6 +12,8 @@ import {
   rewritePaths,
   rewriteStructuredTools,
   rewriteUnconditionalTools,
+  transformRoleFrontmatter,
+  transformSkillFrontmatter,
 } from "../tools/port/rules.mjs";
 
 describe("inventory", () => {
@@ -361,5 +365,154 @@ describe("R7 CLAUDE.md becomes AGENTS.md", () => {
     expect(rewriteClaudeMd("Update CLAUDE.md and src/CLAUDE.md")).toBe(
       "Update AGENTS.md and src/AGENTS.md",
     );
+  });
+});
+
+const SKILL_FM = [
+  "name: dev-story",
+  "description: Implement one story end to end. Run after /create-stories.",
+  "argument-hint: <story-id>",
+  "user-invocable: true",
+  "allowed-tools: Read, Glob, Grep, Write, Edit, Bash",
+  "model: sonnet",
+  "agent: lead-programmer",
+  "",
+].join("\n");
+
+describe("R10/R12 skill frontmatter", () => {
+  it("renames, adds the model-invocation switch, and folds the rest into metadata", () => {
+    const { frontmatter, routedRole } = transformSkillFrontmatter(SKILL_FM, "gs-dev-story");
+    expect(frontmatter).toContain("name: gs-dev-story");
+    expect(frontmatter).toContain("disable-model-invocation: true");
+    expect(frontmatter).toContain("user-invocable: true");
+    expect(frontmatter).toContain("metadata:");
+    expect(frontmatter).toContain("  argument-hint: <story-id>");
+    expect(frontmatter).toContain("  agent: lead-programmer");
+    expect(frontmatter).toContain("  model: sonnet");
+    expect(frontmatter).not.toContain("allowed-tools:");
+    expect(routedRole).toBe("lead-programmer");
+  });
+
+  it("runs the command whitelist over the description too", () => {
+    const { frontmatter } = transformSkillFrontmatter(SKILL_FM, "gs-dev-story");
+    expect(frontmatter).toContain("Run after /gs-create-stories.");
+  });
+
+  it("never emits a rejected legacy invocation spelling", () => {
+    const { frontmatter } = transformSkillFrontmatter(SKILL_FM, "gs-dev-story");
+    for (const bad of ["disableModelInvocation", "modelInvocable", "userInvocable"]) {
+      expect(frontmatter).not.toContain(bad);
+    }
+  });
+
+  it("reports no routed role when upstream had none", () => {
+    const fm = "name: help\ndescription: Show help.\nuser-invocable: true\nmodel: haiku\n";
+    expect(transformSkillFrontmatter(fm, "gs-help").routedRole).toBeUndefined();
+  });
+});
+
+const ROLE_FM = [
+  "name: gameplay-programmer",
+  "description: Implements gameplay systems.",
+  "tools: Read, Glob, Grep, Write, Edit, Bash",
+  "model: sonnet",
+  "maxTurns: 30",
+  "memory: user",
+  "disallowedTools: WebSearch",
+  "",
+].join("\n");
+
+describe("R11 role frontmatter", () => {
+  it("emits the harness-shaped keys and moves the rest into an advisory block", () => {
+    const { frontmatter, advisory } = transformRoleFrontmatter(ROLE_FM, "gameplay-programmer");
+    expect(frontmatter).toContain("role: gameplay-programmer");
+    expect(frontmatter).toContain("tier: 3");
+    expect(frontmatter).toContain("department: engineering");
+    expect(frontmatter).toContain("model-tier: sonnet");
+    expect(frontmatter).not.toContain("maxTurns");
+    expect(frontmatter).not.toContain("disallowedTools");
+    expect(advisory).toContain("Suggested tools");
+    expect(advisory).toContain("maxTurns");
+  });
+
+  it("assigns tier 1 to a director", () => {
+    const fm = "name: producer\ndescription: d\ntools: Read\nmodel: opus\nmaxTurns: 30\n";
+    expect(transformRoleFrontmatter(fm, "producer").frontmatter).toContain("tier: 1");
+  });
+});
+
+describe("R13 routing line", () => {
+  it("appends a model-visible line naming the usual role", () => {
+    expect(appendRoutingLine("# Body\n\nText.\n", "lead-programmer")).toBe(
+      "# Body\n\nText.\n\n---\n\nUsually executed by the `lead-programmer` role. Load `gs-roster` for the delegation protocol.\n",
+    );
+  });
+});
+
+describe("R10/R11 frontmatter values with embedded colons stay parseable YAML", () => {
+  it("quotes a skill description containing a colon so re-parsing recovers it exactly", () => {
+    // Real corpus shape: 15/73 skill descriptions and 25/49 agent descriptions
+    // contain a mid-string ": " — upstream double-quotes every description for
+    // exactly this reason. A naive `description: ${value}` interpolation would
+    // silently corrupt these into a nested mapping.
+    const fm = [
+      "name: consistency-check",
+      // Real upstream files double-quote every description; this fixture
+      // does the same so the INPUT itself is valid YAML — the point under
+      // test is the OUTPUT re-serialization, not upstream's own quoting.
+      'description: "Detect inconsistencies: same entity, different stats."',
+      "user-invocable: true",
+      "allowed-tools: Read",
+      "model: sonnet",
+      "",
+    ].join("\n");
+    const { frontmatter } = transformSkillFrontmatter(fm, "gs-consistency-check");
+    const parsed = parseYaml(frontmatter);
+    expect(parsed.description).toBe("Detect inconsistencies: same entity, different stats.");
+  });
+
+  it("quotes a role description containing a colon so re-parsing recovers it exactly", () => {
+    const fm = [
+      "name: qa-lead",
+      'description: "Owns QA: test plans, triage, and release sign-off."',
+      "tools: Read",
+      "model: sonnet",
+      "",
+    ].join("\n");
+    const { frontmatter } = transformRoleFrontmatter(fm, "qa-lead");
+    const parsed = parseYaml(frontmatter);
+    expect(parsed.description).toBe("Owns QA: test plans, triage, and release sign-off.");
+  });
+
+  it("preserves a multi-line metadata value (upstream's shell-command context block) without corrupting the YAML", () => {
+    // Real corpus shape: three skills (changelog, help, sprint-plan) carry a
+    // `context: |` block scalar of shell commands. Naive string interpolation
+    // would splice the embedded newline into the metadata block unindented,
+    // breaking the YAML for every file after it.
+    const fm = [
+      "name: sprint-status",
+      "description: Reports sprint status.",
+      "user-invocable: true",
+      "allowed-tools: Read",
+      "context: |",
+      "  !ls production/sprints/ 2>/dev/null",
+      "",
+    ].join("\n");
+    const { frontmatter } = transformSkillFrontmatter(fm, "gs-sprint-status");
+    const parsed = parseYaml(frontmatter);
+    expect(parsed.metadata.context).toContain("!ls production/sprints/");
+  });
+
+  it("never lets the routed-role lookup or the role lookup be fooled by Object.prototype membership", () => {
+    // ROLES is a plain object; `"constructor" in ROLES` is true via the
+    // prototype chain even though it is not a real role. The routedRole
+    // check and transformRoleFrontmatter's own guard must use isRole()
+    // (Set-backed, exact membership), not a bare `ROLES[key]` truthiness
+    // check, so a stray `agent: constructor` can't be misread as valid.
+    const fm = "name: x\ndescription: d\nuser-invocable: true\nallowed-tools: Read\nagent: constructor\n";
+    expect(transformSkillFrontmatter(fm, "gs-x").routedRole).toBeUndefined();
+    expect(() =>
+      transformRoleFrontmatter("name: constructor\ndescription: d\ntools: Read\nmodel: sonnet\n", "constructor"),
+    ).toThrow();
   });
 });

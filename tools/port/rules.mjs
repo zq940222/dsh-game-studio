@@ -15,7 +15,8 @@
  * @module tools/port/rules
  */
 
-import { isCommand, isRole } from "./inventory.mjs";
+import { stringify as stringifyYaml, parse as parseYaml } from "yaml";
+import { ROLES, isCommand, isRole } from "./inventory.mjs";
 
 /** Tool names that never occur as English words in the upstream corpus. */
 const UNCONDITIONAL = Object.freeze({
@@ -282,4 +283,135 @@ export function rewritePaths(text, dest) {
 /** R7: the workspace instruction file is `AGENTS.md` on this harness. */
 export function rewriteClaudeMd(text) {
   return text.split("CLAUDE.md").join("AGENTS.md");
+}
+
+/** Keys that survive as top-level skill frontmatter; everything else folds into metadata. */
+const SKILL_TOP_LEVEL = new Set(["name", "description", "user-invocable"]);
+/** Keys with no harness meaning at all — dropped, not folded. */
+const SKILL_DROP = new Set(["allowed-tools"]);
+
+/**
+ * R10/R12: reshape one upstream skill's frontmatter for the harness.
+ *
+ * `disable-model-invocation: true` is ADDED — upstream has no such key — and
+ * upstream's `user-invocable: true` is kept as-is. Everything else the
+ * harness has no field for folds into the open `metadata` object rather than
+ * being discarded, since the catalog carries only `name` and `description`
+ * and metadata therefore costs nothing at model-facing prompt time.
+ * `allowed-tools` is the one exception: it is dropped outright, not folded,
+ * because it is a list of Claude Code tool names with no harness meaning at
+ * all, folded or otherwise.
+ *
+ * The frontmatter is assembled as a plain object and rendered with
+ * `yaml.stringify`, not hand-joined template strings. That is not a style
+ * preference: measured against the real upstream corpus, 15 of 73 skill
+ * descriptions (and 25 of 49 role descriptions, in the sibling transform)
+ * contain a mid-string ": " — upstream double-quotes every description for
+ * exactly this reason — and three skills (`changelog`, `help`, `sprint-plan`)
+ * carry a `context: |` block-scalar of shell commands. A naive
+ * `` `description: ${value}` `` line would silently misparse the first case
+ * as an unintended nested mapping, and splice the second case's embedded
+ * newline into the metadata block unindented, corrupting the YAML for every
+ * key that followed it in the same file. `lineWidth: 0` additionally
+ * disables yaml's default 80-column folding, which would otherwise wrap a
+ * long plain-scalar description across lines unpredictably and break any
+ * caller matching on its text.
+ * @param raw - the upstream frontmatter block, without the `---` fences.
+ * @param commandName - the ported name, e.g. `gs-dev-story`.
+ * @returns the new frontmatter block and the routed role, if any.
+ */
+export function transformSkillFrontmatter(raw, commandName) {
+  const data = parseYaml(raw) ?? {};
+  const top = {
+    name: commandName,
+    description: rewriteCommands(String(data.description ?? "")).trim(),
+    "disable-model-invocation": true,
+    "user-invocable": true,
+  };
+  const metaEntries = Object.entries(data).filter(
+    ([k]) => !SKILL_TOP_LEVEL.has(k) && !SKILL_DROP.has(k),
+  );
+  if (metaEntries.length > 0) {
+    top.metadata = Object.fromEntries(metaEntries);
+  }
+  // isRole(), not a bare ROLES[...] truthiness check: ROLES is a plain
+  // object, so `ROLES["constructor"]` is truthy via the prototype chain even
+  // though "constructor" is never a real role.
+  const routedRole = typeof data.agent === "string" && isRole(data.agent) ? data.agent : void 0;
+  return { frontmatter: stringifyYaml(top, { lineWidth: 0 }), routedRole };
+}
+
+/** Keys that become an advisory prose block in the role brief's body. */
+const ROLE_ADVISORY = ["tools", "disallowedTools", "maxTurns", "memory", "isolation", "skills"];
+
+/**
+ * R11: reshape one upstream agent definition into a role brief header.
+ *
+ * The harness has no per-agent tool allowlist, turn cap, or memory scope, so
+ * those upstream fields would silently do nothing if kept as fields; instead
+ * they become an advisory prose block the delegated child reads.
+ *
+ * The advisory quotes upstream's raw values as historical fact, not as an
+ * instruction: `data[k]` here is read directly off the parsed upstream
+ * frontmatter and is never passed through the R1/R2 body rewrite rules, and
+ * the prose explicitly frames the list as what upstream Claude Code granted
+ * this role, noting that this harness has no per-agent tool allowlist. A
+ * half-migrated tool list (e.g. "Read, glob, grep, Write, Edit, Bash") would
+ * be worse than either leaving it fully alone or dropping it, and `Bash`
+ * specifically cannot be migrated at all — the `standard` agent preset
+ * disables `tool-bash` on Windows.
+ *
+ * CALLER CONTRACT: `raw` must be the untouched upstream frontmatter — call
+ * this before running the R1/R2 body rewrites on the rest of the file, and
+ * splice the returned `advisory` into the body only after those rules have
+ * already run over everything else, so the quoted list is never itself
+ * rewritten.
+ * @param raw - the upstream frontmatter block, without the `---` fences.
+ * @param roleName - the role's file name without extension.
+ * @returns the new frontmatter block and the advisory prose block.
+ */
+export function transformRoleFrontmatter(raw, roleName) {
+  if (!isRole(roleName)) throw new Error(`port: unknown role "${roleName}"`);
+  const data = parseYaml(raw) ?? {};
+  const entry = ROLES[roleName];
+  const top = {
+    role: roleName,
+    description: rewriteCommands(String(data.description ?? "")).trim(),
+    tier: entry.tier,
+    department: entry.department,
+    "model-tier": data.model ?? "sonnet",
+  };
+  const frontmatter = stringifyYaml(top, { lineWidth: 0 });
+
+  const present = ROLE_ADVISORY.filter((k) => data[k] !== void 0);
+  const advisory = present.length === 0 ? "" : [
+    "",
+    "## Suggested tools and limits",
+    "",
+    "Upstream Claude Code granted this role the configuration below. This",
+    "harness has no per-agent tool allowlist, turn cap, or memory scope, so",
+    "none of it is enforced here — read it as a description of the role's",
+    "intended scope, not as something this harness restricts or grants:",
+    "",
+    ...present.map((k) => `- \`${k}\`: ${Array.isArray(data[k]) ? data[k].join(", ") : data[k]}`),
+    "",
+  ].join("\n");
+
+  return { frontmatter, advisory };
+}
+
+/**
+ * R13: append the model-visible routing hint.
+ *
+ * The routed role also lives in the skill's `metadata` object (see
+ * {@link transformSkillFrontmatter}), but metadata never reaches the model —
+ * only the body does — so the same fact is repeated here where the model
+ * will actually see it. Deliberate duplication, not redundancy.
+ * @param body - the skill body.
+ * @param role - the role that usually executes this command.
+ * @returns the body with one appended line.
+ */
+export function appendRoutingLine(body, role) {
+  const trimmed = body.endsWith("\n") ? body : body + "\n";
+  return `${trimmed}\n---\n\nUsually executed by the \`${role}\` role. Load \`gs-roster\` for the delegation protocol.\n`;
 }
