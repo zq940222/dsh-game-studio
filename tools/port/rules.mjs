@@ -218,3 +218,47 @@ export function rewriteDelegation(text) {
     return `delegate to \`${value}\` (the child reads \`roles/${value}.md\` itself)`;
   });
 }
+
+/** Where a rewritten file will live, which decides how paths are expressed. */
+export const DEST = Object.freeze({
+  ORCHESTRATION: "orchestration",
+  SKILL: "skill",
+  DOC: "doc",
+});
+
+/** Upstream directory -> content/ subdirectory, longest prefix first. */
+const PATH_MAP = Object.freeze([
+  [".claude/docs/templates/", "templates/"],
+  [".claude/docs/", "handbook/"],
+  [".claude/agents/", "roles/"],
+  [".claude/rules/", "rules/"],
+  [".claude/skills/", "skills/gs-"],
+  ["docs/engine-reference/", "engines/"],
+]);
+
+/**
+ * R6/R8: rewrite an upstream path to its content/ location, expressed the way
+ * the destination file can actually resolve it.
+ *
+ * Orchestration files are loaded as runtime skills with markers substituted at
+ * apply time, so they use `%%GS_CONTENT_DIR%%`. Command skills, templates, and
+ * handbook documents are shipped VERBATIM by the filesystem provider — a
+ * marker in one of them would reach the model unsubstituted with no error at
+ * all — so they use a path relative to their own resource base.
+ * @param text - one file's full text.
+ * @param dest - one of {@link DEST}.
+ * @returns the text with upstream paths redirected.
+ */
+export function rewritePaths(text, dest) {
+  const prefix = dest === DEST.ORCHESTRATION ? "%%GS_CONTENT_DIR%%" : "../../";
+  let out = text;
+  for (const [from, to] of PATH_MAP) {
+    out = out.split(from).join(prefix + to);
+  }
+  return out;
+}
+
+/** R7: the workspace instruction file is `AGENTS.md` on this harness. */
+export function rewriteClaudeMd(text) {
+  return text.split("CLAUDE.md").join("AGENTS.md");
+}

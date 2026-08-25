@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { COMMANDS, EXCLUDED_DOCS, ROLES, UPSTREAM_SHA, isCommand, isRole } from "../tools/port/inventory.mjs";
 import {
+  DEST,
   findBashSites,
+  rewriteClaudeMd,
   rewriteCommands,
   rewriteDelegation,
+  rewritePaths,
   rewriteStructuredTools,
   rewriteUnconditionalTools,
 } from "../tools/port/rules.mjs";
@@ -274,5 +277,47 @@ describe("R5 delegation", () => {
   it("leaves an unknown role untouched so the manifest can flag it", () => {
     const s = "`subagent_type: nonexistent-role`";
     expect(rewriteDelegation(s)).toBe(s);
+  });
+});
+
+describe("R6/R8 paths dispatch on destination", () => {
+  it("uses the substitution marker for orchestration files", () => {
+    expect(rewritePaths("See .claude/agents/producer.md", DEST.ORCHESTRATION)).toBe(
+      "See %%GS_CONTENT_DIR%%roles/producer.md",
+    );
+  });
+
+  it("uses a resource-root-relative path for command skills", () => {
+    expect(rewritePaths("See .claude/agents/producer.md", DEST.SKILL)).toBe(
+      "See ../../roles/producer.md",
+    );
+  });
+
+  it("NEVER emits a marker for a command skill — the provider ships bodies verbatim", () => {
+    const out = rewritePaths(".claude/rules/ai-code.md and .claude/docs/templates/art-bible.md", DEST.SKILL);
+    expect(out).not.toContain("%%GS_");
+    expect(out).toBe("../../rules/ai-code.md and ../../templates/art-bible.md");
+  });
+
+  it("maps every upstream directory to its content/ destination", () => {
+    const cases: [string, string][] = [
+      [".claude/agents/x.md", "roles/x.md"],
+      [".claude/rules/x.md", "rules/x.md"],
+      [".claude/docs/templates/x.md", "templates/x.md"],
+      [".claude/docs/x.md", "handbook/x.md"],
+      [".claude/skills/x/SKILL.md", "skills/gs-x/SKILL.md"],
+      ["docs/engine-reference/godot/x.md", "engines/godot/x.md"],
+    ];
+    for (const [from, to] of cases) {
+      expect(rewritePaths(from, DEST.DOC)).toBe(`../../${to}`);
+    }
+  });
+});
+
+describe("R7 CLAUDE.md becomes AGENTS.md", () => {
+  it("rewrites the filename wherever it appears", () => {
+    expect(rewriteClaudeMd("Update CLAUDE.md and src/CLAUDE.md")).toBe(
+      "Update AGENTS.md and src/AGENTS.md",
+    );
   });
 });
