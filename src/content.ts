@@ -220,22 +220,27 @@ function scanForLeaks(dir: string, source: string): SkillProblem[] {
 }
 
 /**
- * G1/G2 over a skills root: `<root>/<name>/SKILL.md`, one directory per skill.
+ * G1/G2 over a skills root: `<root>/<name>/`, one directory per skill.
+ * Scans every `.md` file inside each skill directory, not only
+ * `SKILL.md`: the harness treats a skill's `references/`, `scripts/`,
+ * and `assets/` subdirectories as resource roots the model is told to
+ * read at an absolute path (Phase 1's own install probe proved that
+ * path works, reading `references/probe.md` from a different drive),
+ * so a resource file is exactly as model-facing as `SKILL.md` itself.
  * @param root - a skills root, trailing slash included.
- * @returns one problem per offending file.
+ * @returns one problem per offending file. `dir` stays the SKILL
+ *   DIRECTORY name (not the individual file), so lint output still
+ *   names which skill to fix; `detail` names the specific file inside
+ *   it, e.g. "... (references/probe.md)".
  */
 export function checkNoMarkers(root: string): SkillProblem[] {
   const problems: SkillProblem[] = [];
   for (const entry of readdirSync(root)) {
     const dir = `${root}${entry}`;
     if (!statSync(dir).isDirectory()) continue;
-    let source: string;
-    try {
-      source = readFileSync(`${dir}/SKILL.md`, "utf8");
-    } catch {
-      continue;
+    for (const found of checkNoMarkersTree(`${dir}/`)) {
+      problems.push({ dir: entry, kind: found.kind, detail: `${found.detail} (${found.dir})` });
     }
-    problems.push(...scanForLeaks(entry, source));
   }
   return problems;
 }

@@ -42,4 +42,4 @@ if (problems.length > 0) {
   process.stderr.write(`\n${problems.length} problem(s) in the shipped content tree.\n`);
   process.exit(1);
 }
-process.stdout.write("content lint: all shipped content satisfies the provider's invariants\n");
+process.stdout.write("content lint: shipped content passes the filesystem provider's own invariants and this package's publish gates\n");

@@ -174,6 +174,31 @@ describe("G1 command skills must never carry a substitution marker", () => {
     const bareCr = problems.filter((p) => p.dir === "gs-bare-cr");
     expect(bareCr.map((p) => p.kind)).toContain("crlf");
   });
+
+  // The harness treats a skill's references/, scripts/, and assets/
+  // subdirectories as resource roots the model is told to read at an
+  // absolute path (Phase 1's own install probe proved that path works,
+  // reading references/probe.md from a different drive) — so a resource
+  // file is exactly as model-facing as SKILL.md itself, and checking only
+  // SKILL.md would miss a marker or CRLF that ships right beside it.
+  it("flags a marker in a skill's reference file, not only SKILL.md, and still reports the skill directory", () => {
+    const problems = checkNoMarkers(markerFixtures);
+    const refLeak = problems.find((p) => p.dir === "gs-ref-leak" && p.kind === "marker-leak");
+    expect(refLeak).toBeDefined();
+    expect(refLeak?.detail).toContain("references/leaky.md");
+  });
+
+  it("flags CRLF in a skill's reference file, not only SKILL.md, and still reports the skill directory", () => {
+    const problems = checkNoMarkers(crlfFixtures);
+    const refCrlf = problems.find((p) => p.dir === "gs-ref-crlf" && p.kind === "crlf");
+    expect(refCrlf).toBeDefined();
+    expect(refCrlf?.detail).toContain("references/leaky.md");
+  });
+
+  it("raises nothing for the real content/skills/ tree, including gs-ping's references/probe.md", () => {
+    const problems = checkNoMarkers(`${contentDir()}skills/`);
+    expect(problems).toEqual([]);
+  });
 });
 
 describe("G1/G2 also cover flat role-brief roots (no SKILL.md nesting)", () => {
