@@ -324,7 +324,7 @@ Post-Cutoff API Conflicts:
 
 ### Engine Specialist Consultation
 
-After completing the engine audit above, spawn the **primary engine specialist** via Task for a domain-expert second opinion:
+After completing the engine audit above, spawn the **primary engine specialist** via a subagent for a domain-expert second opinion:
 - Read `../../handbook/technical-preferences.md` `Engine Specialists` section to get the primary specialist
 - If no engine is configured, skip this consultation
 - Spawn a subagent for `[primary specialist]` (the child reads its own brief under `roles/`) with: all ADRs that contain engine-specific decisions or `Post-Cutoff APIs Used` fields, the engine reference docs, and the Phase 5 audit findings. Ask them to:

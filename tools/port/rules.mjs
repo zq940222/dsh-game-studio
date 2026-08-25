@@ -67,6 +67,59 @@ const COMPOUND_PHRASES = Object.freeze([
   ["Task subagent", "subagent"],
 ]);
 
+/**
+ * Delegation idioms that pair "Task" with a following word — the corpus's
+ * DOMINANT way of naming the delegation mechanism, measured after a Task 14
+ * review caught that the initial COMPOUND_PHRASES pass covered "Task tool"
+ * (15 sites) and "Task subagent" (16) but missed the rest: 38 ported files
+ * carrying ~86 imperative "spawn via Task" / "issue N Task calls" commands
+ * to call a tool this harness does not have. Measured population, each
+ * reviewed for false positives (none found — no C# `Task`, no task-tracking
+ * prose):
+ *   - "via Task" (78) — "spawn `art-director` via Task", "(via Task)
+ *     returns BLOCKED". By far the dominant idiom.
+ *   - "Task calls" (11) — "issue all four Task calls simultaneously".
+ *   - "Task agents" (2) — one of the two wrapped across a line break in the
+ *     source (`Task\nagents`), which is exactly why this list uses regexes
+ *     with `\s+` rather than a literal split/join: a fixed-string match
+ *     would silently miss that one.
+ *   - "Task prompt" (1) — "do not serialize document content into the Task
+ *     prompt".
+ *   - "Task in this skill" (1) — design-review.md's CRITICAL callout.
+ * Deliberately NOT a blanket `\bTask\b` -> `subagent`: that would also
+ * rewrite 57 frontmatter tool-allowlist lines (moot in practice — those are
+ * dropped by transformSkillFrontmatter/kept verbatim as advisory prose by
+ * transformRoleFrontmatter, so rewriteStructuredTools never actually sees
+ * them — but the corpus still contains them as raw text this rule must not
+ * assume), the C# `Task.Delay()`/`async Task<T>` samples in
+ * godot-csharp-specialist.md and the engine-reference Addressables docs,
+ * the `| ID | Task | Owner | ... |` table header in producer.md, and the
+ * work-item field labels (`Task: Implement hitbox detection`,
+ * `(Epic, Feature, Task)`, bracketed `[Task 1]` placeholders in templates)
+ * that name a project-management "task", not the delegation tool. Every one
+ * of those keeps bare `Task` deliberately — verified by re-scanning the
+ * ported output for every remaining bare `Task` after this list runs (see
+ * the port report's residual list).
+ */
+// `Task\s+agents` -> `subagents` collapses two words into one, so on the
+// one corpus site where the source wraps across the join point
+// (review-all-gdds/SKILL.md's `Task\nagents`) this rule removes a line —
+// unlike rewriteClaudeCodeMentions' `a\s+Claude-evaluated` entry, there is
+// no whitespace left in the two-word-to-one-word output to replay the
+// original newline into. Confirmed harmless for the current corpus: that
+// file carries no Bash site after the join point (recordBashSites' line
+// numbers are otherwise all computed from PRE-rewriteBody text, so a rule
+// that changes a file's line count without report.mjs feeding the delta
+// back in — the way the frontmatter-regeneration delta is — could, if that
+// changed, misreport a later Bash site's line by one).
+const TASK_DELEGATION_PHRASES = Object.freeze([
+  [/\bvia\s+Task\b/g, "via a subagent"],
+  [/\bTask\s+calls\b/g, "subagent calls"],
+  [/\bTask\s+agents\b/g, "subagents"],
+  [/\bTask\s+prompt\b/g, "subagent prompt"],
+  [/\bTask\s+in\s+this\s+skill\b/g, "The subagent tool in this skill"],
+]);
+
 /** R1: rewrite the names that cannot collide with prose. */
 export function rewriteUnconditionalTools(text) {
   let out = text;
@@ -93,6 +146,11 @@ export function rewriteStructuredTools(text) {
   // COMPOUND_PHRASES for why these three have no over-match surface.
   for (const [from, to] of COMPOUND_PHRASES) {
     out = out.split(from).join(to);
+  }
+  // Delegation idioms: see TASK_DELEGATION_PHRASES for the measured
+  // population and why each of these five needs its own line.
+  for (const [re, to] of TASK_DELEGATION_PHRASES) {
+    out = out.replace(re, to);
   }
   return out;
 }
@@ -300,6 +358,60 @@ export function rewritePaths(text, dest) {
 /** R7: the workspace instruction file is `AGENTS.md` on this harness. */
 export function rewriteClaudeMd(text) {
   return text.split("CLAUDE.md").join("AGENTS.md");
+}
+
+/**
+ * R14: literal, zero-false-positive rewrites of Claude Code's own branding
+ * and model identity, wherever they recur across the corpus rather than at
+ * one specific file. Each entry was checked for a false-positive population
+ * before being added:
+ *   - `Claude Code session` / `Claude session` (7 real sites, one file
+ *     already excluded, one already replaced wholesale by a fixupClaudeDocResidue
+ *     block) — the corpus's way of naming "a session of this assistant";
+ *     regex so the optional `Code` and an optional plural both collapse to
+ *     one line instead of four.
+ *   - `Claude's training data` (1 site, engines/README.md) — the corpus
+ *     elsewhere already says "the LLM's training data" for the identical
+ *     fact (gs-setup-engine's description), so this reuses that vocabulary
+ *     rather than inventing a second phrasing for the same idea.
+ *   - `Ask Claude to` (1 site, workflow-guide.md) — an example prompt
+ *     addressed to a specific model brand; this harness is model-agnostic.
+ *   - `Claude-evaluated` (1 site, gs-skill-test) and `Claude (reverse-doc)`
+ *     (3 sites, reverse-documentation templates) — both name the model
+ *     performing the work, not Claude Code the harness, but are equally
+ *     brand-specific on a model-agnostic harness.
+ * Deliberately does NOT touch the "Upstream Claude Code granted this role
+ * the configuration below" sentence transformRoleFrontmatter's advisory
+ * block generates: that is a true, deliberate historical statement about
+ * what upstream granted, not a residual leftover — see that function's own
+ * doc comment.
+ */
+const CLAUDE_CODE_MENTIONS = Object.freeze([
+  [/\bClaude(?:\s+Code)?\s+session(s?)\b/g, "session$1"],
+  ["Claude's training data", "The LLM's training data"],
+  ["Ask Claude to", "Ask the model to"],
+  // The leading article is part of the match (not just "Claude-evaluated"
+  // -> "LLM-evaluated") because the one real site reads "This is a
+  // Claude-evaluated reasoning check" — dropping in "LLM" alone would leave
+  // the wrong article ("a LLM-evaluated"), since "LLM" takes "an". A regex
+  // rather than a literal split/join because the source hard-wraps mid-
+  // phrase here too ("This is a\nClaude-evaluated..."), the same shape of
+  // gap TASK_DELEGATION_PHRASES' `Task\s+agents` entry exists for. The
+  // whitespace itself is CAPTURED and replayed rather than collapsed to a
+  // fixed space, so a wrapped source keeps its line count — unlike
+  // `Task\s+agents` -> `subagents`, this replacement still has two words on
+  // either side of a gap, so there is a place to put the original
+  // whitespace back.
+  [/\ba(\s+)Claude-evaluated\b/g, (_, ws) => `an${ws}LLM-evaluated`],
+  ["Claude (reverse-doc)", "LLM (reverse-doc)"],
+]);
+
+export function rewriteClaudeCodeMentions(text) {
+  let out = text;
+  for (const [from, to] of CLAUDE_CODE_MENTIONS) {
+    out = from instanceof RegExp ? out.replace(from, to) : out.split(from).join(to);
+  }
+  return out;
 }
 
 /** Keys that survive as top-level skill frontmatter; everything else folds into metadata. */

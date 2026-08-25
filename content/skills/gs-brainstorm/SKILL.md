@@ -203,7 +203,7 @@ Repeat until the user selects [A] Lock these in.
 - `lean` → skip both (not PHASE-GATEs). Note: "CD-PILLARS skipped — Lean mode. AD-CONCEPT-VISUAL skipped — Lean mode." Proceed to Phase 5.
 - `full` → spawn as normal.
 
-**After pillars and anti-pillars are agreed, spawn BOTH `creative-director` AND `art-director` via Task in parallel before moving to Phase 5. Issue both Task calls simultaneously — do not wait for one before starting the other.**
+**After pillars and anti-pillars are agreed, spawn BOTH `creative-director` AND `art-director` via a subagent in parallel before moving to Phase 5. Issue both subagent calls simultaneously — do not wait for one before starting the other.**
 
 - **`creative-director`** — gate **CD-PILLARS** (`../../handbook/director-gates.md`)
   Pass: full pillar set with design tests, anti-pillars, core fantasy, unique hook.
@@ -261,7 +261,7 @@ Ground the concept in reality:
 - `lean` → skip (not a PHASE-GATE). Note: "TD-FEASIBILITY skipped — Lean mode." Proceed directly to scope tier definition.
 - `full` → spawn as normal.
 
-**After identifying biggest technical risks, spawn `technical-director` via Task using gate TD-FEASIBILITY (`../../handbook/director-gates.md`) before scope tiers are defined.**
+**After identifying biggest technical risks, spawn `technical-director` via a subagent using gate TD-FEASIBILITY (`../../handbook/director-gates.md`) before scope tiers are defined.**
 
 Pass: core loop description, platform target, engine choice (or "undecided"), list of identified technical risks.
 
@@ -272,7 +272,7 @@ Present the assessment to the user. If HIGH RISK, offer to revisit scope before 
 - `lean` → skip (not a PHASE-GATE). Note: "PR-SCOPE skipped — Lean mode." Proceed to document generation.
 - `full` → spawn as normal.
 
-**After scope tiers are defined, spawn `producer` via Task using gate PR-SCOPE (`../../handbook/director-gates.md`).**
+**After scope tiers are defined, spawn `producer` via a subagent using gate PR-SCOPE (`../../handbook/director-gates.md`).**
 
 Pass: full vision scope, MVP definition, timeline estimate, team size.
 
@@ -343,7 +343,7 @@ This is a multi-phase skill. If context reaches or exceeds 70% during any phase,
 append this notice to the current response before continuing:
 
 > **Context is approaching the limit (≥70%).** The game concept document is saved
-> to `design/gdd/game-concept.md`. Open a fresh Claude Code session to continue
+> to `design/gdd/game-concept.md`. Open a fresh session to continue
 > if needed — progress is not lost.
 
 ---

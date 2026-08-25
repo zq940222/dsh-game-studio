@@ -129,7 +129,7 @@ All documents save to `design/live-ops/`:
 
 ## Error Recovery Protocol
 
-If any spawned agent (via Task) returns BLOCKED, errors, or cannot complete:
+If any spawned agent (via a subagent) returns BLOCKED, errors, or cannot complete:
 
 1. **Surface immediately**: Report "[AgentName]: BLOCKED — [reason]" to the user before continuing to dependent phases
 2. **Assess dependencies**: Check whether the blocked agent's output is required by subsequent phases. If yes, do not proceed past that dependency point without user input.
@@ -144,7 +144,7 @@ If a BLOCKED state is unresolvable, end with Verdict: **BLOCKED** instead of COM
 ## File Write Protocol
 
 All file writes (season design docs, analytics plans, communication calendars) are
-delegated to sub-agents spawned via Task. Each sub-agent enforces the
+delegated to sub-agents spawned via a subagent. Each sub-agent enforces the
 "May I write to [path]?" protocol. This orchestrator does not write files directly.
 
 ## Output

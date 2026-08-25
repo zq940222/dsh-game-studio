@@ -336,7 +336,7 @@ to implement it.]
 - [Links to related design documents]
 ```
 
-5.5. **Engine Specialist Validation** — Before saving, spawn the **primary engine specialist** via Task to validate the drafted ADR:
+5.5. **Engine Specialist Validation** — Before saving, spawn the **primary engine specialist** via a subagent to validate the drafted ADR:
    - Read `../../handbook/technical-preferences.md` `Engine Specialists` section to get the primary specialist
    - If no engine is configured (`[TO BE CONFIGURED]`), skip this step
    - Spawn a subagent for `[primary specialist]` (the child reads its own brief under `roles/`) with: the ADR's Engine Compatibility section, Decision section, Key Interfaces, and the engine reference docs path. Ask them to:
@@ -351,7 +351,7 @@ to implement it.]
 - `lean` → skip (not a PHASE-GATE). Note: "TD-ADR skipped — Lean mode." Proceed to Step 5.7 (GDD sync check).
 - `full` → spawn as normal.
 
-5.6. **Technical Director Strategic Review** — After the engine specialist validation, spawn `technical-director` via Task using gate **TD-ADR** (`../../handbook/director-gates.md`):
+5.6. **Technical Director Strategic Review** — After the engine specialist validation, spawn `technical-director` via a subagent using gate **TD-ADR** (`../../handbook/director-gates.md`):
    - Pass: the ADR file path (or draft content), engine version, domain, any existing ADRs in the same domain
    - The TD validates architectural coherence (is this decision consistent with the whole system?) — distinct from the engine specialist's API-level check
    - If CONCERNS or REJECT: revise the Decision or Alternatives sections accordingly before proceeding
@@ -447,7 +447,7 @@ If there are no remaining priority ADRs and no undesigned GDD systems, offer onl
 
 **Always include this fixed notice in the closing output (do NOT omit it):**
 
-> To validate ADR coverage against your GDDs, open a **fresh Claude Code session**
+> To validate ADR coverage against your GDDs, open a **fresh session**
 > and run `/gs-architecture-review`.
 >
 > **Never run `/gs-architecture-review` in the same session as `/gs-architecture-decision`.**

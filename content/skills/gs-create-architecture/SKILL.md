@@ -354,7 +354,7 @@ Apply gate **TD-ARCHITECTURE** (`../../handbook/director-gates.md`) as a self-re
 - `lean` → skip (not a PHASE-GATE). Note: "LP-FEASIBILITY skipped — Lean mode." Proceed to Phase 8 handoff.
 - `full` → spawn as normal.
 
-**Step 2 — Spawn `lead-programmer` via Task using gate LP-FEASIBILITY (`../../handbook/director-gates.md`):**
+**Step 2 — Spawn `lead-programmer` via a subagent using gate LP-FEASIBILITY (`../../handbook/director-gates.md`):**
 
 Pass: architecture document path, technical requirements baseline summary, ADR list.
 

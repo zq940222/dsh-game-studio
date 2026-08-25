@@ -314,7 +314,7 @@ For items that can't be automatically verified, **ask the user**:
 
 (Review mode was resolved in Phase 1. Use that stored value here.)
 
-Before generating the final verdict, spawn all four directors as **parallel subagents** via Task using the parallel gate protocol from `../../handbook/director-gates.md`. Issue all four Task calls simultaneously — do not wait for one before starting the next.
+Before generating the final verdict, spawn all four directors as **parallel subagents** via a subagent using the parallel gate protocol from `../../handbook/director-gates.md`. Issue all four subagent calls simultaneously — do not wait for one before starting the next.
 
 **Spawn in parallel:**
 

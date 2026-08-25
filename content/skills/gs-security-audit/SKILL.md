@@ -46,7 +46,7 @@ Read `../../handbook/technical-preferences.md` to determine:
 
 ## Phase 2: Spawn Security Engineer
 
-Spawn `security-engineer` via Task. Pass:
+Spawn `security-engineer` via a subagent. Pass:
 - The audit scope/mode
 - Engine and language from technical preferences
 - A manifest of all source directories: `src/`, `assets/data/`, any config files

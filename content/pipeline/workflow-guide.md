@@ -1,10 +1,11 @@
-# Claude Code Game Studios -- Complete Workflow Guide
+# Game Studio -- Complete Workflow Guide
 
 > **How to go from zero to a shipped game using the Agent Architecture.**
 >
 > This guide walks you through every phase of game development using the
-> 49-agent system, 73 slash commands, and 12 automated hooks. It assumes you
-> have Claude Code installed and are working from the project root.
+> 49-agent system, 73 slash commands, and a set of coordination checklists
+> (see `NOTICE` for what upstream's 12 automated hooks became on this
+> harness). It assumes you are working from the project root.
 >
 > The pipeline has 7 phases. Each phase has a formal gate (`/gs-gate-check`)
 > that must pass before you advance. The authoritative phase sequence is
@@ -35,10 +36,7 @@
 
 Before you start, make sure you have:
 
-- **Claude Code** installed and working
 - **Git** with Git Bash (Windows) or standard terminal (Mac/Linux)
-- **jq** (optional but recommended -- hooks fall back to `grep` if missing)
-- **Python 3** (optional -- some hooks use it for JSON validation)
 
 ### Step 1: Clone and Open
 
@@ -1108,8 +1106,8 @@ Coordinates release-manager, QA, and DevOps through:
 
 ### Step 7.5: Ship
 
-The `validate-push` hook will warn you when pushing to `main` or `develop`.
-This is intentional -- release pushes should be deliberate:
+There is no automatic push guard here (see `NOTICE`) — treat pushes to
+`main` or `develop` as deliberate, considered actions:
 
 ```bash
 git tag v1.0.0
@@ -1133,7 +1131,7 @@ Bypasses normal sprint processes with a full audit trail:
 **Post-mortem** after launch stabilizes:
 
 ```
-Ask Claude to create a post-mortem using the template at
+Ask the model to create a post-mortem using the template at
 ../templates/post-mortem.md
 ```
 
@@ -1251,9 +1249,9 @@ section to file immediately after approval. This means completed sections
 survive crashes and context compactions. Previous discussion about written
 sections can be safely compacted.
 
-**Automatic recovery:** The `session-start.sh` hook detects and previews
-`active.md` automatically. The `pre-compact.sh` hook dumps state into the
-conversation before compaction.
+**Recovery, done by hand:** There is no session-start or pre-compact hook
+here (see `NOTICE`) — open and read `active.md` yourself at the start of a
+session, and write your state to it yourself before compacting.
 
 **Sprint status tracking:** `production/sprint-status.yaml` is the
 machine-readable story tracker. Written by `/gs-sprint-plan` (init) and
@@ -1651,7 +1649,8 @@ conflicts go to `producer`.
    delta time, accessibility, etc.).
 
 4. **Compact proactively.** At ~65-70% context usage, compact or `/clear`.
-   The pre-compact hook saves your progress. Do not wait until you are at the
+   There is no pre-compact hook to save your progress automatically (see
+   `NOTICE`) — write it to file yourself. Do not wait until you are at the
    limit.
 
 5. **Use the right tier of agent.** Do not ask `creative-director` to write a

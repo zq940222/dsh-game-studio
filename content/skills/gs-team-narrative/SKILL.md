@@ -61,7 +61,7 @@ Delegate to **narrative-director**:
 - Output: narrative brief with story requirements
 
 ### Phase 2: World Foundation (parallel)
-Delegate in parallel — issue all three Task calls simultaneously before waiting for any result:
+Delegate in parallel — issue all three subagent calls simultaneously before waiting for any result:
 - **world-builder**: Create or update lore entries for factions, locations, and history relevant to this content. Cross-reference against existing lore for contradictions. Set canon level for new entries.
 - **writer**: Draft character dialogue using voice profiles. Ensure all lines are under 120 characters, use named placeholders for variables, and are localization-ready.
 - **art-director**: Define character visual design direction for key characters appearing in this content (silhouette, visual archetype, distinguishing features). Specify environmental visual storytelling elements for each key space (prop composition, lighting notes, spatial arrangement). Define tone palette and cinematic direction for any cutscenes or scripted sequences.
@@ -88,7 +88,7 @@ Delegate in parallel:
 
 ## Error Recovery Protocol
 
-If any spawned agent (via Task) returns BLOCKED, errors, or cannot complete:
+If any spawned agent (via a subagent) returns BLOCKED, errors, or cannot complete:
 
 1. **Surface immediately**: Report "[AgentName]: BLOCKED — [reason]" to the user before continuing to dependent phases
 2. **Assess dependencies**: Check whether the blocked agent's output is required by subsequent phases. If yes, do not proceed past that dependency point without user input.
@@ -107,7 +107,7 @@ Common blockers:
 ## File Write Protocol
 
 All file writes (narrative docs, dialogue files, lore entries) are delegated to
-sub-agents spawned via Task. Each sub-agent enforces the "May I write to [path]?"
+sub-agents spawned via a subagent. Each sub-agent enforces the "May I write to [path]?"
 protocol. This orchestrator does not write files directly.
 
 ## Output

@@ -261,7 +261,7 @@ the project — cross-reference it with sprint estimates.
 **Review mode check:**
 - `solo` → skip. Note: "CD-PLAYTEST skipped — Solo mode."
 - `lean` → skip (not a PHASE-GATE). Note: "CD-PLAYTEST skipped — Lean mode."
-- `full` → spawn `creative-director` via Task using gate **CD-PLAYTEST**
+- `full` → spawn `creative-director` via a subagent using gate **CD-PLAYTEST**
   (`../../handbook/director-gates.md`).
 
 Pass: the full REPORT.md content, the validation question, game pillars and core

@@ -111,7 +111,7 @@ For each story, determine:
 - `lean` → skip (not a PHASE-GATE). Note: "QL-STORY-READY skipped — Lean mode." Proceed to Step 5 (present stories for review).
 - `full` → spawn as normal.
 
-After decomposing all stories (Step 4 complete) but before presenting them for write approval, spawn `qa-lead` via Task using gate **QL-STORY-READY** (`../../handbook/director-gates.md`).
+After decomposing all stories (Step 4 complete) but before presenting them for write approval, spawn `qa-lead` via a subagent using gate **QL-STORY-READY** (`../../handbook/director-gates.md`).
 
 Pass: the full story list with acceptance criteria, story types, and TR-IDs; the epic's GDD acceptance criteria for reference.
 

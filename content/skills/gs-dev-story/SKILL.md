@@ -137,7 +137,7 @@ Silently update two things before spawning any agent:
 ## Phase 3: Route to the Right Programmer
 
 Based on the story's **Layer**, **Type**, and **system name**, determine which
-specialist to spawn via Task.
+specialist to spawn via a subagent.
 
 **Config/Data stories — skip agent spawning entirely:**
 If the story's Type is `Config/Data`, no programmer agent or engine specialist is needed. Jump directly to Phase 4 (Config/Data note). The implementation is a data file edit — no routing table evaluation, no engine specialist.
@@ -175,9 +175,9 @@ assumptions about post-cutoff engine APIs that need expert verification.
 
 ## Phase 4: Implement
 
-Spawn the chosen programmer agent(s) via Task with the full context package:
+Spawn the chosen programmer agent(s) via a subagent with the full context package:
 
-Brief the agent with file paths and targeted reading instructions — do not serialize document content into the Task prompt. The agent reads what it needs directly:
+Brief the agent with file paths and targeted reading instructions — do not serialize document content into the subagent prompt. The agent reads what it needs directly:
 
 1. **Story file**: `[story-path]` — read in full
 2. **GDD requirement**: look up TR-ID `[TR-XXX-NNN]` in `docs/architecture/tr-registry.yaml` — use the `requirement` field as source of truth
@@ -279,7 +279,7 @@ Create `active.md` if it does not exist. Confirm: "Session state updated."
 
 ## Error Recovery Protocol
 
-If any spawned agent (via Task) returns BLOCKED, errors, or cannot complete:
+If any spawned agent (via a subagent) returns BLOCKED, errors, or cannot complete:
 
 1. **Surface immediately**: Report "[AgentName]: BLOCKED — [reason]" to the user before continuing to dependent phases
 2. **Assess dependencies**: Check whether the blocked agent's output is required by subsequent phases. If yes, do not proceed past that dependency point without user input.
@@ -298,7 +298,7 @@ Common blockers:
 
 ## Collaborative Protocol
 
-- **File writes are delegated** — all source code, test files, and evidence docs are written by sub-agents spawned via Task. Each sub-agent enforces the "May I write to [path]?" protocol individually. This orchestrator does not write files directly.
+- **File writes are delegated** — all source code, test files, and evidence docs are written by sub-agents spawned via a subagent. Each sub-agent enforces the "May I write to [path]?" protocol individually. This orchestrator does not write files directly.
 - **Load before implementing** — do not start coding until all context is loaded
   (story, TR-ID, ADR, manifest, engine prefs). Incomplete context produces code
   that drifts from design.

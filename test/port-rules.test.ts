@@ -6,6 +6,7 @@ import {
   appendRoutingLine,
   DEST,
   findBashSites,
+  rewriteClaudeCodeMentions,
   rewriteClaudeMd,
   rewriteCommands,
   rewriteDelegation,
@@ -179,6 +180,64 @@ describe("R2 enumerated compound phrases", () => {
 
   it("leaves an unrelated lowercase phrase alone", () => {
     const prose = "The level edit tools panel is under the View menu.";
+    expect(rewriteStructuredTools(prose)).toBe(prose);
+  });
+});
+
+describe("R2 delegation idioms (via Task / Task calls / Task agents / Task prompt / Task in this skill)", () => {
+  it("rewrites 'via Task' regardless of what follows", () => {
+    // Real corpus site: skills/art-bible/SKILL.md:86.
+    expect(rewriteStructuredTools("Spawn `art-director` via Task:")).toBe(
+      "Spawn `art-director` via a subagent:",
+    );
+    // Real corpus site: skills/team-qa/SKILL.md — parenthetical form.
+    expect(rewriteStructuredTools("If any spawned agent (via Task) returns BLOCKED.")).toBe(
+      "If any spawned agent (via a subagent) returns BLOCKED.",
+    );
+  });
+
+  it("rewrites 'Task calls'", () => {
+    // Real corpus site: skills/gate-check/SKILL.md:317.
+    expect(rewriteStructuredTools("Issue all four Task calls simultaneously.")).toBe(
+      "Issue all four subagent calls simultaneously.",
+    );
+  });
+
+  it("rewrites 'Task agents' even when the source wraps the two words across a line break", () => {
+    // Real corpus site: skills/review-all-gdds/SKILL.md:104 — the upstream
+    // markdown source hard-wraps mid-phrase (`Task\nagents`), which is
+    // exactly why this is a regex with \s+ rather than a literal split/join.
+    expect(rewriteStructuredTools("Spawn both as parallel Task\nagents simultaneously.")).toBe(
+      "Spawn both as parallel subagents simultaneously.",
+    );
+    expect(rewriteStructuredTools("spawning parallel Task agents for Phase 2")).toBe(
+      "spawning parallel subagents for Phase 2",
+    );
+  });
+
+  it("rewrites 'Task prompt'", () => {
+    // Real corpus site: skills/dev-story/SKILL.md:179.
+    expect(rewriteStructuredTools("do not serialize document content into the Task prompt")).toBe(
+      "do not serialize document content into the subagent prompt",
+    );
+  });
+
+  it("rewrites 'Task in this skill'", () => {
+    // Real corpus site: skills/design-review/SKILL.md:105.
+    expect(rewriteStructuredTools("CRITICAL: Task in this skill spawns a SUBAGENT")).toBe(
+      "CRITICAL: The subagent tool in this skill spawns a SUBAGENT",
+    );
+  });
+
+  it("does not touch the C# async Task type or work-item 'task' prose", () => {
+    const prose = [
+      "await Task.Delay(1000);",
+      "async Task<GameObject> LoadEnemyAsync(string key) {",
+      "| ID | Task | Owner | Estimate | Dependencies | Status |",
+      "Task: Implement hitbox detection",
+      "All three fields (Epic, Feature, Task) are optional.",
+      "- [ ] [Task 1 — e.g., \"Add missing unit tests\"]",
+    ].join("\n");
     expect(rewriteStructuredTools(prose)).toBe(prose);
   });
 });
@@ -366,6 +425,66 @@ describe("R7 CLAUDE.md becomes AGENTS.md", () => {
     expect(rewriteClaudeMd("Update CLAUDE.md and src/CLAUDE.md")).toBe(
       "Update AGENTS.md and src/AGENTS.md",
     );
+  });
+});
+
+describe("R14 Claude Code branding and model identity", () => {
+  it("rewrites 'Claude Code session' and the bare 'Claude session' variant, singular or plural", () => {
+    // Real corpus site: docs/context-management.md:3.
+    expect(rewriteClaudeCodeMentions("Context is the most critical resource in a Claude Code session.")).toBe(
+      "Context is the most critical resource in a session.",
+    );
+    // Real corpus site: skills/design-review/SKILL.md:105 — no "Code".
+    expect(rewriteClaudeCodeMentions("a separate independent Claude session")).toBe(
+      "a separate independent session",
+    );
+    // The plural capture group, independent of the "Code" being optional —
+    // the one real plural site (coordination-rules.md's excised Agent Teams
+    // section) wraps the word in markdown emphasis (`*sessions*`), which
+    // this rule never has to reach because that whole block is deleted
+    // before rewriteClaudeCodeMentions runs; this checks the group itself.
+    expect(rewriteClaudeCodeMentions("Multiple independent Claude Code sessions running")).toBe(
+      "Multiple independent sessions running",
+    );
+  });
+
+  it("rewrites 'Claude's training data' to the vocabulary already used elsewhere in the corpus", () => {
+    // Real corpus site: docs/engine-reference/README.md:9.
+    expect(rewriteClaudeCodeMentions("Claude's training data has a knowledge cutoff (currently May 2025).")).toBe(
+      "The LLM's training data has a knowledge cutoff (currently May 2025).",
+    );
+  });
+
+  it("rewrites 'Ask Claude to', 'Claude-evaluated', and 'Claude (reverse-doc)'", () => {
+    // Real corpus site: docs/WORKFLOW-GUIDE.md:1134.
+    expect(rewriteClaudeCodeMentions("Ask Claude to create a post-mortem")).toBe(
+      "Ask the model to create a post-mortem",
+    );
+    // Real corpus site: skills/skill-test/SKILL.md:165-166 — the source
+    // hard-wraps mid-phrase ("This is a\nClaude-evaluated reasoning
+    // check"), which is why this is a regex rather than a literal
+    // split/join. The leading article is part of the match precisely so
+    // the result reads "an LLM-evaluated", not "a LLM-evaluated" — and the
+    // original newline is REPLAYED, not collapsed to a space, so the
+    // file's line count (and every Bash-site line number after this point)
+    // does not shift.
+    expect(rewriteClaudeCodeMentions("This is a\nClaude-evaluated reasoning check.")).toBe(
+      "This is an\nLLM-evaluated reasoning check.",
+    );
+    expect(rewriteClaudeCodeMentions("This is a Claude-evaluated reasoning check.")).toBe(
+      "This is an LLM-evaluated reasoning check.",
+    );
+    // Real corpus site: templates/architecture-doc-from-code.md:227.
+    expect(rewriteClaudeCodeMentions("| [Date] | Claude (reverse-doc) | Initial |")).toBe(
+      "| [Date] | LLM (reverse-doc) | Initial |",
+    );
+  });
+
+  it("does not touch the advisory block's deliberate historical mention", () => {
+    // transformRoleFrontmatter's own advisory prose names Claude Code on
+    // purpose, as a fact about what upstream granted — not a residual leftover.
+    const s = "Upstream Claude Code granted this role the configuration below.";
+    expect(rewriteClaudeCodeMentions(s)).toBe(s);
   });
 });
 

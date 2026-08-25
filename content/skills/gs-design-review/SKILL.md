@@ -103,12 +103,12 @@ These are the most common baselines — but not required for pure UI specs, audi
 
 ### Step 2 — Spawn all relevant specialists in parallel
 
-**CRITICAL: Task in this skill spawns a SUBAGENT — a separate independent Claude session
+**CRITICAL: The subagent tool in this skill spawns a SUBAGENT — a separate independent session
 with its own context window. It is NOT task tracking. Do NOT simulate specialist
 perspectives internally. Do NOT reason through domain views yourself. You MUST issue
-actual Task calls. A simulated review is not a specialist review.**
+actual subagent calls. A simulated review is not a specialist review.**
 
-Issue all Task calls simultaneously. Do NOT spawn one at a time.
+Issue all subagent calls simultaneously. Do NOT spawn one at a time.
 
 **Prompt each specialist adversarially:**
 > "Here is the GDD for [system] and the main review's structural findings so far.

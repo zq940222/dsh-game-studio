@@ -14,7 +14,7 @@ all key Tier 2 leads. Any skill, team orchestrator, or workflow may invoke these
 In any skill, replace an inline director prompt with a reference:
 
 ```
-Spawn `creative-director` via Task using gate **CD-PILLARS** from
+Spawn `creative-director` via a subagent using gate **CD-PILLARS** from
 `../handbook/director-gates.md`.
 ```
 
@@ -78,7 +78,7 @@ Apply the resolved mode:
 
 ```
 # Apply mode check, then:
-Spawn `[agent-name]` via Task:
+Spawn `[agent-name]` via a subagent:
 - Gate: [GATE-ID] (see ../handbook/director-gates.md)
 - Context: [fields listed under that gate]
 - Await the verdict before proceeding.
@@ -88,7 +88,7 @@ For parallel spawning (multiple directors at the same gate point):
 
 ```
 # Apply mode check for each gate first, then spawn all that survive:
-Spawn all [N] agents simultaneously via Task — issue all Task calls before
+Spawn all [N] agents simultaneously via a subagent — issue all subagent calls before
 waiting for any result. Collect all verdicts before proceeding.
 ```
 
@@ -766,7 +766,7 @@ When a workflow requires multiple directors at the same checkpoint (most common
 at `/gs-gate-check`), spawn all agents simultaneously:
 
 ```
-Spawn in parallel (issue all Task calls before waiting for any result):
+Spawn in parallel (issue all subagent calls before waiting for any result):
 1. creative-director  → gate CD-PHASE-GATE
 2. technical-director → gate TD-PHASE-GATE
 3. producer           → gate PR-PHASE-GATE

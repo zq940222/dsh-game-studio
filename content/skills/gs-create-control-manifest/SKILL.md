@@ -131,7 +131,7 @@ Use `ask_user_question`:
 - `lean` → skip. Note: "TD-MANIFEST skipped — Lean mode." Proceed to Phase 5.
 - `full` → spawn as normal.
 
-Spawn `technical-director` via Task using gate **TD-MANIFEST** (`../../handbook/director-gates.md`).
+Spawn `technical-director` via a subagent using gate **TD-MANIFEST** (`../../handbook/director-gates.md`).
 
 Pass: the Control Manifest Preview from Phase 4 (rule counts per layer, full extracted rule list), the list of ADRs covered, engine version, and any rules sourced from technical-preferences.md or engine reference docs.
 

@@ -92,7 +92,7 @@ Identify the system category (engine, gameplay, AI, networking, UI, tools) and e
 
 ## Phase 7: Specialist Reviews (Parallel)
 
-Spawn all applicable specialists simultaneously via Task — do not wait for one before starting the next.
+Spawn all applicable specialists simultaneously via a subagent — do not wait for one before starting the next.
 
 ### Engine Specialists
 
@@ -107,7 +107,7 @@ Also spawn the **Primary Specialist** for any file touching engine architecture 
 
 ### QA Testability Review
 
-For Logic and Integration stories, also spawn `qa-tester` via Task in parallel with the engine specialists. Pass:
+For Logic and Integration stories, also spawn `qa-tester` via a subagent in parallel with the engine specialists. Pass:
 - The implementation files being reviewed
 - The story's `## QA Test Cases` section (the pre-written test specs from qa-lead)
 - The story's `## Acceptance Criteria`
