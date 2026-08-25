@@ -219,11 +219,28 @@ export function rewriteDelegation(text) {
   });
 }
 
-/** Where a rewritten file will live, which decides how paths are expressed. */
+/**
+ * Where a rewritten file will live, which decides both whether it gets the
+ * substitution marker and, if not, how many `../` segments reach `content/`.
+ *
+ * The depth split exists because a relative path is resolved from the
+ * REWRITTEN FILE'S OWN location, not from `content/`'s root, and that
+ * location varies:
+ *   - `content/skills/gs-<name>/SKILL.md` and `content/engines/<engine>/x.md`
+ *     both sit two levels under `content/`, so `../../` reaches the root.
+ *   - `content/handbook/x.md`, `content/templates/x.md`, `content/rules/x.md`,
+ *     `content/roles/x.md`, and `content/pipeline/x.md` sit one level under
+ *     `content/`, so `../../` overshoots by one — it resolves to the
+ *     directory ABOVE `content/`, where nothing exists, and nothing catches
+ *     the mistake: these files carry no resource base and no loader scans
+ *     them for broken links, so a wrong depth is silent in exactly the way
+ *     the marker rule exists to prevent, just running the other direction.
+ */
 export const DEST = Object.freeze({
   ORCHESTRATION: "orchestration",
   SKILL: "skill",
   DOC: "doc",
+  DOC_NESTED: "doc-nested",
 });
 
 /** Upstream directory -> content/ subdirectory, longest prefix first. */
@@ -241,16 +258,20 @@ const PATH_MAP = Object.freeze([
  * the destination file can actually resolve it.
  *
  * Orchestration files are loaded as runtime skills with markers substituted at
- * apply time, so they use `%%GS_CONTENT_DIR%%`. Command skills, templates, and
- * handbook documents are shipped VERBATIM by the filesystem provider — a
- * marker in one of them would reach the model unsubstituted with no error at
- * all — so they use a path relative to their own resource base.
+ * apply time, so they use `%%GS_CONTENT_DIR%%`. Everything else is shipped
+ * VERBATIM by the filesystem provider — a marker in one of them would reach
+ * the model unsubstituted with no error at all — so they use a path relative
+ * to their own location, at the depth {@link DEST} declares for that
+ * destination. Anything that is not exactly `DEST.ORCHESTRATION` falls
+ * through to a relative form rather than the marker; that fallback is what
+ * guarantees a marker can never reach a command skill, so it must not be
+ * narrowed to an exact match on every known destination.
  * @param text - one file's full text.
  * @param dest - one of {@link DEST}.
  * @returns the text with upstream paths redirected.
  */
 export function rewritePaths(text, dest) {
-  const prefix = dest === DEST.ORCHESTRATION ? "%%GS_CONTENT_DIR%%" : "../../";
+  const prefix = dest === DEST.ORCHESTRATION ? "%%GS_CONTENT_DIR%%" : dest === DEST.DOC ? "../" : "../../";
   let out = text;
   for (const [from, to] of PATH_MAP) {
     out = out.split(from).join(prefix + to);

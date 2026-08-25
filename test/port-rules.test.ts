@@ -1,3 +1,4 @@
+import { posix } from "node:path";
 import { describe, expect, it } from "vitest";
 import { COMMANDS, EXCLUDED_DOCS, ROLES, UPSTREAM_SHA, isCommand, isRole } from "../tools/port/inventory.mjs";
 import {
@@ -287,29 +288,70 @@ describe("R6/R8 paths dispatch on destination", () => {
     );
   });
 
-  it("uses a resource-root-relative path for command skills", () => {
+  it("uses a two-level-up relative path for command skills (content/skills/gs-x/SKILL.md)", () => {
     expect(rewritePaths("See .claude/agents/producer.md", DEST.SKILL)).toBe(
       "See ../../roles/producer.md",
     );
   });
 
-  it("NEVER emits a marker for a command skill — the provider ships bodies verbatim", () => {
-    const out = rewritePaths(".claude/rules/ai-code.md and .claude/docs/templates/art-bible.md", DEST.SKILL);
-    expect(out).not.toContain("%%GS_");
-    expect(out).toBe("../../rules/ai-code.md and ../../templates/art-bible.md");
+  it("uses a ONE-level-up relative path for handbook/template/rule/role/pipeline docs (content/<dir>/x.md) — not two", () => {
+    // The defect this guards against: content/handbook/x.md sits one level under
+    // content/, so `../../` overshoots to the directory ABOVE content/, where
+    // nothing exists. Only `../` lands back inside content/.
+    expect(rewritePaths("See .claude/agents/producer.md", DEST.DOC)).toBe(
+      "See ../roles/producer.md",
+    );
   });
 
-  it("maps every upstream directory to its content/ destination", () => {
+  it("uses a two-level-up relative path for engine-reference docs, which nest one more level (content/engines/<engine>/x.md)", () => {
+    expect(rewritePaths("See docs/engine-reference/godot/x.md", DEST.DOC_NESTED)).toBe(
+      "See ../../engines/godot/x.md",
+    );
+  });
+
+  it("NEVER emits a marker for any non-orchestration destination — the provider ships bodies verbatim", () => {
+    const src = ".claude/rules/ai-code.md and .claude/docs/templates/art-bible.md";
+    for (const dest of [DEST.SKILL, DEST.DOC, DEST.DOC_NESTED]) {
+      const out = rewritePaths(src, dest);
+      expect(out).not.toContain("%%GS_");
+    }
+    expect(rewritePaths(src, DEST.SKILL)).toBe("../../rules/ai-code.md and ../../templates/art-bible.md");
+    expect(rewritePaths(src, DEST.DOC)).toBe("../rules/ai-code.md and ../templates/art-bible.md");
+  });
+
+  it("maps every upstream directory to its content/ destination, at DOC's one-level depth", () => {
     const cases: [string, string][] = [
       [".claude/agents/x.md", "roles/x.md"],
       [".claude/rules/x.md", "rules/x.md"],
       [".claude/docs/templates/x.md", "templates/x.md"],
       [".claude/docs/x.md", "handbook/x.md"],
       [".claude/skills/x/SKILL.md", "skills/gs-x/SKILL.md"],
-      ["docs/engine-reference/godot/x.md", "engines/godot/x.md"],
     ];
     for (const [from, to] of cases) {
-      expect(rewritePaths(from, DEST.DOC)).toBe(`../../${to}`);
+      expect(rewritePaths(from, DEST.DOC)).toBe(`../${to}`);
+    }
+  });
+
+  it("resolves the emitted relative path back inside content/ for every non-marker destination and real output location", () => {
+    // A fixture string comparison cannot catch a depth error — the whole
+    // defect this test exists for is a relative path that string-compares
+    // "correctly" against a hand-written expectation but resolves nowhere.
+    // Resolving it against a representative real Task-12 output location is
+    // what makes the check meaningful.
+    const cases: [string, string][] = [
+      ["content/skills/gs-help/SKILL.md", DEST.SKILL],
+      ["content/handbook/agent-roster.md", DEST.DOC],
+      ["content/templates/art-bible.md", DEST.DOC],
+      ["content/rules/ai-code.md", DEST.DOC],
+      ["content/roles/producer.md", DEST.DOC],
+      ["content/pipeline/vertical-slice.md", DEST.DOC],
+      ["content/engines/godot/gdscript-basics.md", DEST.DOC_NESTED],
+    ];
+    for (const [outputPath, dest] of cases) {
+      const rewritten = rewritePaths(".claude/agents/producer.md", dest);
+      const resolved = posix.resolve("/", posix.dirname(outputPath), rewritten);
+      expect(resolved).toBe("/content/roles/producer.md");
+      expect(resolved.startsWith("/content/")).toBe(true);
     }
   });
 });
