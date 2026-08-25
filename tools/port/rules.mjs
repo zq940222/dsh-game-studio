@@ -127,19 +127,73 @@ export function findBashSites(text) {
 }
 
 /**
+ * R4/R12's slash-shaped-candidate pattern, shared by the rewrite and its
+ * counter so the two can never silently desync.
+ *
+ * Measured against the real upstream `.claude` corpus (196 files): 1323 raw
+ * candidates, of which 1263 are genuine commands and 60 are genuine
+ * non-commands — real filesystem paths (`/root`, `/dev`, `/bin`, `/src`),
+ * glob fragments (`/enemies` inside content-audit's recursive directory
+ * glob), and Claude Code's own
+ * `/clear` and `/compact`, none of which are in this project's 73-name
+ * whitelist. The whitelist earns its place by excluding that real 60, not
+ * because commands are rare — within this corpus most slash-shaped strings
+ * genuinely are commands, since the corpus is the command system's own
+ * documentation.
+ *
+ * Two exclusions beyond the whitelist check itself, both earned by a real
+ * corpus site, not written defensively:
+ * - A preceding `]` is excluded in addition to word/`/`/`-` characters.
+ *   Without it, a bracketed path segment like
+ *   `production/releases/[version]/patch-notes.md` has its final path
+ *   segment misread as a command start, because `]` is not a word
+ *   character. A preceding `[` is NOT excluded — `[/story-done runs after
+ *   QA signs off]` is a genuine command mention and must still rewrite.
+ * - A following `.` + alphanumeric (a file extension) is excluded via
+ *   trailing lookaheads. A command reference is never immediately followed
+ *   by a file extension; a path's basename can coincidentally match a
+ *   command name and be followed by one (`.../changelog.md`,
+ *   `.../patch-notes.md`). The `(?![a-z0-9-])` lookahead directly after the
+ *   captured name forces the engine to fail the whole match — rather than
+ *   quietly backtracking to a shorter, wrong capture — whenever the
+ *   trailing-extension check rejects the maximal name. A bare command with
+ *   trailing punctuation and no extension (`Run /changelog.`) still
+ *   rewrites: nothing alphanumeric immediately follows that period.
+ */
+const COMMAND_SLASH_RE = /(?<![\w/\]-])\/([a-z][a-z0-9-]*)(?![a-z0-9-])(?!\.[a-z0-9]+)/g;
+
+/**
  * R4/R12: prefix slash commands, whitelist-driven.
  *
- * The upstream corpus carries 997 slash-shaped strings and only a fraction
- * are commands; the rest are paths, ratios, and URL segments. Consulting the
- * whitelist is what makes those immune instead of collateral damage. Applies
- * to frontmatter values too, since `description:` also names commands.
+ * Consulting the whitelist is what makes filesystem paths, glob fragments,
+ * and Claude Code's own builtins immune instead of collateral damage. See
+ * COMMAND_SLASH_RE's doc comment for the measured corpus breakdown and the
+ * two non-whitelist exclusions. Applies to frontmatter values too, since
+ * `description:` also names commands.
  * @param text - one file's full text.
  * @returns the text with every known command prefixed exactly once.
  */
 export function rewriteCommands(text) {
-  return text.replace(/(?<![\w/-])\/([a-z][a-z0-9-]*)/g, (match, name) =>
+  return text.replace(COMMAND_SLASH_RE, (match, name) =>
     isCommand(name) ? `/gs-${name}` : match,
   );
+}
+
+/**
+ * Counts how many slash-shaped candidates in `text` are genuine commands,
+ * using rewriteCommands' own pattern and whitelist check rather than a
+ * re-derived approximation — so a future edit to the rule can't silently
+ * desync the reported metric from what the rule actually matched.
+ * @param text - one file's full text.
+ * @returns the number of candidates that pass isCommand().
+ */
+export function countCommandHits(text) {
+  let hits = 0;
+  text.replace(COMMAND_SLASH_RE, (match, name) => {
+    if (isCommand(name)) hits++;
+    return match;
+  });
+  return hits;
 }
 
 /**

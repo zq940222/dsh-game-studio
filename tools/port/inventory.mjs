@@ -1,9 +1,14 @@
 /**
  * Whitelists and inventory constants the port transformer keys off.
  * Every list here is the ground truth a rule consults before rewriting —
- * the `/cmd` rewrite in particular is whitelist-driven precisely because
- * the upstream body carries 997 slash-shaped strings, most of which are
- * paths and ratios rather than commands.
+ * the `/cmd` rewrite in particular is whitelist-driven because, measured
+ * against the real upstream `.claude` corpus, 1323 slash-shaped strings
+ * exist and 60 of them are genuine non-commands (filesystem paths, glob
+ * fragments, Claude Code's own `/clear` and `/compact`) that a blind
+ * rewrite would corrupt. The whitelist's job is excluding that real 60,
+ * not filtering out a majority — most slash-shaped strings in this corpus
+ * genuinely are commands, since the corpus is the command system's own
+ * documentation.
  *
  * @module tools/port/inventory
  */

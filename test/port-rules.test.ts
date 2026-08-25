@@ -232,6 +232,29 @@ describe("R4 command names are whitelist-driven", () => {
       "description: Runs after /gs-smoke-check.",
     );
   });
+
+  it("does not corrupt a bracketed path segment whose basename collides with a command name", () => {
+    // Real corpus site: agents/community-manager.md:82 and :144, skills/patch-notes/SKILL.md
+    // (multiple lines). Before the `]` lookbehind fix, the `]` in `[version]` isn't a word
+    // character, so the regex misread the path's final segment as a command start and produced
+    // a filename that does not exist: `.../gs-patch-notes.md`.
+    const s = "- Patch notes go in `production/releases/[version]/patch-notes.md`";
+    expect(rewriteCommands(s)).toBe(s);
+  });
+
+  it("does not treat a command-shaped basename immediately followed by a file extension as a command", () => {
+    // Real corpus site: skills/patch-notes/SKILL.md:22 — same defect class as the `]` case
+    // above (a path basename colliding with a command name), caught by an orthogonal guard:
+    // a genuine command reference is never immediately followed by `.<extension>`.
+    const s = "Read the internal changelog at `production/releases/[version]/changelog.md` if it exists";
+    expect(rewriteCommands(s)).toBe(s);
+  });
+
+  it("still rewrites a command followed by trailing punctuation with no extension", () => {
+    // Guards against the extension check over-suppressing: a bare command at the end of a
+    // sentence has a period but nothing alphanumeric immediately after it.
+    expect(rewriteCommands("Run /changelog.")).toBe("Run /gs-changelog.");
+  });
 });
 
 describe("R5 delegation", () => {
