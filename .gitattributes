@@ -1,0 +1,10 @@
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.webp binary
+
+# This fixture's whole reason to exist is a literal CRLF checkout — it
+# proves checkNoMarkers' G2 check fires on real bytes. The blanket
+# `eol=lf` above would silently normalize it away on the next checkin,
+# so it is exempted and stored/checked out byte-for-byte instead.
+test/fixtures/crlf-skills/** -text

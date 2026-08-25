@@ -2,9 +2,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { isSkillName } from "@deepseek-ai/dsh-skill";
-import { checkSkillDir, checkSkillRoot, contentDir } from "../src/content.js";
+import { checkNoMarkers, checkSkillDir, checkSkillRoot, contentDir } from "../src/content.js";
 
 const fixtures = fileURLToPath(new URL("./fixtures/skills/", import.meta.url));
+const markerFixtures = fileURLToPath(new URL("./fixtures/marker-skills/", import.meta.url));
+const crlfFixtures = fileURLToPath(new URL("./fixtures/crlf-skills/", import.meta.url));
 const read = (dir: string) => readFileSync(`${fixtures}${dir}/SKILL.md`, "utf8");
 
 describe("checkSkillDir", () => {
@@ -137,5 +139,22 @@ describe("contentDir", () => {
   it("points at this package's own content directory", () => {
     expect(contentDir().endsWith("/")).toBe(true);
     expect(existsSync(contentDir())).toBe(true);
+  });
+});
+
+describe("G1 command skills must never carry a substitution marker", () => {
+  it("flags a marker in a shipped command skill", () => {
+    const problems = checkNoMarkers(`${fixtures}`);
+    expect(problems).toEqual([]);
+  });
+
+  it("flags a marker when one is present", () => {
+    const problems = checkNoMarkers(markerFixtures);
+    expect(problems.map((p) => p.kind)).toContain("marker-leak");
+  });
+
+  it("flags CRLF in a shipped command skill", () => {
+    const problems = checkNoMarkers(crlfFixtures);
+    expect(problems.map((p) => p.kind)).toContain("crlf");
   });
 });

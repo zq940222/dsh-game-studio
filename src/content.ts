@@ -22,7 +22,15 @@ export function contentDir(): string {
 
 export interface SkillProblem {
   dir: string;
-  kind: "name-mismatch" | "not-kebab" | "bad-boolean" | "missing-field" | "unparsable" | "loose-file";
+  kind:
+    | "name-mismatch"
+    | "not-kebab"
+    | "bad-boolean"
+    | "missing-field"
+    | "unparsable"
+    | "loose-file"
+    | "marker-leak"
+    | "crlf";
   detail: string;
 }
 
@@ -173,6 +181,39 @@ export function checkSkillRoot(root: string): SkillProblem[] {
       continue;
     }
     problems.push(...checkSkillDir(entry, source));
+  }
+  return problems;
+}
+
+/**
+ * G1/G2: command-skill bodies are shipped VERBATIM by the filesystem provider —
+ * there is no substitution pass and no fail-loud scan on this path, unlike the
+ * orchestration loader. A `%%GS_` marker here would reach the model unchanged
+ * with no error at all, and a CRLF checkout would inject `\r` throughout.
+ * @param root - a skills root, trailing slash included.
+ * @returns one problem per offending file.
+ */
+export function checkNoMarkers(root: string): SkillProblem[] {
+  const problems: SkillProblem[] = [];
+  for (const entry of readdirSync(root)) {
+    const dir = `${root}${entry}`;
+    if (!statSync(dir).isDirectory()) continue;
+    let source: string;
+    try {
+      source = readFileSync(`${dir}/SKILL.md`, "utf8");
+    } catch {
+      continue;
+    }
+    if (source.includes("%%GS_")) {
+      problems.push({
+        dir: entry,
+        kind: "marker-leak",
+        detail: "a %%GS_ marker in a command skill reaches the model unsubstituted",
+      });
+    }
+    if (source.includes("\r\n")) {
+      problems.push({ dir: entry, kind: "crlf", detail: "CRLF line endings would inject \\r into model-facing text" });
+    }
   }
   return problems;
 }

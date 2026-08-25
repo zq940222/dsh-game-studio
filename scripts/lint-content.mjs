@@ -1,10 +1,10 @@
 // Fail the build when any shipped skill would be silently dropped by the
 // filesystem provider. Run from the package root: node scripts/lint-content.mjs
-import { checkSkillRoot } from "../lib/content.js";
+import { checkNoMarkers, checkSkillRoot } from "../lib/content.js";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../content/skills/", import.meta.url));
-const problems = checkSkillRoot(root);
+const problems = [...checkSkillRoot(root), ...checkNoMarkers(root)];
 for (const problem of problems) {
   process.stderr.write(`${problem.dir}: [${problem.kind}] ${problem.detail}\n`);
 }
