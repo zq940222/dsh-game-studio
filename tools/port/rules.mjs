@@ -255,6 +255,20 @@ const PATH_MAP = Object.freeze([
 ]);
 
 /**
+ * The depth prefix each {@link DEST} resolves a path with. Exported so a
+ * caller assembling its own path fragments for the same destination (e.g.
+ * port.mjs's pipeline-relocation fixup, which rewrites a path PATH_MAP
+ * cannot express) can reuse the single source of truth instead of
+ * hand-rolling a second copy that can drift out of sync with this one.
+ */
+export const DEPTH_PREFIX = Object.freeze({
+  [DEST.ORCHESTRATION]: "%%GS_CONTENT_DIR%%",
+  [DEST.DOC]: "../",
+  [DEST.SKILL]: "../../",
+  [DEST.DOC_NESTED]: "../../",
+});
+
+/**
  * R6/R8: rewrite an upstream path to its content/ location, expressed the way
  * the destination file can actually resolve it.
  *
@@ -262,29 +276,19 @@ const PATH_MAP = Object.freeze([
  * apply time, so they use `%%GS_CONTENT_DIR%%`. Everything else is shipped
  * VERBATIM by the filesystem provider — a marker in one of them would reach
  * the model unsubstituted with no error at all — so they use a path relative
- * to their own location, at the depth {@link DEST} declares for that
- * destination. Anything that is not exactly `DEST.ORCHESTRATION` falls
- * through to a relative form rather than the marker; that fallback is what
- * guarantees a marker can never reach a command skill, so it must not be
- * narrowed to an exact match on every known destination.
+ * to their own location, at the depth {@link DEPTH_PREFIX} declares for that
+ * destination. An unrecognized `dest` throws rather than silently defaulting
+ * to any one depth: a silent default previously meant "../../" for anything
+ * that wasn't exactly `DEST.ORCHESTRATION` or `DEST.DOC`, which was the wrong
+ * depth for a DOC-class file with nothing to catch it (the defect Task 10
+ * fixed once already). Throwing means a typo'd or future dest fails loudly
+ * here instead of producing a link that resolves nowhere.
  * @param text - one file's full text.
  * @param dest - one of {@link DEST}.
  * @returns the text with upstream paths redirected.
  */
-const DEPTH_PREFIX = Object.freeze({
-  [DEST.ORCHESTRATION]: "%%GS_CONTENT_DIR%%",
-  [DEST.DOC]: "../",
-  [DEST.SKILL]: "../../",
-  [DEST.DOC_NESTED]: "../../",
-});
-
 export function rewritePaths(text, dest) {
   const prefix = DEPTH_PREFIX[dest];
-  // Fail loud on an unrecognized dest instead of silently falling through to
-  // "../../" — that fallback used to produce the wrong depth for a DOC-class
-  // file with nothing to catch it, the exact defect Task 10 fixed once
-  // already. A future caller passing a typo'd or new dest gets an error
-  // here instead of a link that resolves nowhere.
   if (prefix === void 0) throw new Error(`rewritePaths: unrecognized dest "${dest}"`);
   let out = text;
   for (const [from, to] of PATH_MAP) {

@@ -27,6 +27,24 @@ export const EXPECTED_COUNTS = Object.freeze({
 });
 
 /**
+ * G1: no ported command-skill body may carry a %%GS_ substitution marker.
+ *
+ * The filesystem provider ships command-skill bodies VERBATIM — there is no
+ * substitution pass and no fail-loud scan on that path, unlike the
+ * orchestration loader. A %%GS_ marker under content/skills/** would reach
+ * the model unsubstituted with no error at all.
+ * @param files - the files under content/skills/**, each with its path.
+ * @returns one problem per file that still carries a marker.
+ */
+export function checkMarkerLeaks(files) {
+  const problems = [];
+  for (const { path, text } of files) {
+    if (text.includes("%%GS_")) problems.push(`${path}: contains a %%GS_ substitution marker`);
+  }
+  return problems;
+}
+
+/**
  * G3: every reference in the ported corpus must resolve.
  * @param files - the ported files, each with its content-relative path.
  * @returns one human-readable problem per broken reference.

@@ -24,15 +24,29 @@ import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
 import { EXCLUDED_DOCS, UPSTREAM_SHA } from "./inventory.mjs";
 import {
-  DEST, appendRoutingLine, findBashSites, rewriteClaudeMd, rewriteCommands,
+  DEPTH_PREFIX, DEST, appendRoutingLine, findBashSites, rewriteClaudeMd, rewriteCommands,
   rewriteDelegation, rewritePaths, rewriteStructuredTools, rewriteUnconditionalTools,
   transformRoleFrontmatter, transformSkillFrontmatter,
 } from "./rules.mjs";
-import { checkCounts, checkReferentialIntegrity, renderManifest } from "./manifest.mjs";
+import { checkCounts, checkMarkerLeaks, checkReferentialIntegrity, renderManifest } from "./manifest.mjs";
 
 const snapshot = process.argv[2];
 if (!snapshot) {
   console.error("usage: port.mjs <snapshot-root>");
+  process.exit(2);
+}
+
+// Validate the snapshot BEFORE clearOwned() runs. clearOwned() wipes every
+// directory this script owns; if that ran first and the snapshot turned out
+// to be missing or incomplete, a typo'd argument would gut the working tree
+// (everything it owns, not just skills) and then die on the first
+// readFileSync with a raw ENOENT and no explanation of what happened or why.
+// gs-ping and orchestration/ would still be safe (clearOwned never touches
+// them) and a correct re-run regenerates everything else, but Task 14 is
+// about to commit this output, so failing before touching disk matters.
+const snapshotSkillsDir = join(snapshot, ".claude/skills");
+if (!existsSync(snapshotSkillsDir)) {
+  console.error(`port: snapshot not found or incomplete: ${snapshotSkillsDir} does not exist`);
   process.exit(2);
 }
 
@@ -97,9 +111,25 @@ function recordBashSites(rawText, outPath) {
  * `.claude/docs/workflow-catalog.yaml` is converted to Markdown and moved to
  * `content/pipeline/workflow-catalog.md` — a relocation the shared PATH_MAP
  * cannot express, since it changes both the destination bucket AND the file
- * extension. Two real corpus sites name it by upstream path:
- * `.claude/skills/help/SKILL.md` and `docs/WORKFLOW-GUIDE.md` itself. Fixed
- * up here, before rewritePaths runs, so the generic
+ * extension. THREE real corpus sites name it, only two of which this literal
+ * pass rewrites:
+ *   - `.claude/skills/help/SKILL.md` and `docs/WORKFLOW-GUIDE.md` itself name
+ *     it by the full upstream path `.claude/docs/workflow-catalog.yaml` —
+ *     path-shaped and unambiguous, so rewritten here.
+ *   - `.claude/docs/quick-start.md` names it by BARE FILENAME
+ *     (`workflow-catalog.yaml`, inside an ASCII directory-tree listing), with
+ *     no path prefix to match on. Deliberately left alone: matching a bare
+ *     filename risks false-positiving on unrelated prose, and quick-start.md
+ *     is already in G3's failure set for a different leftover `.claude/`
+ *     line in that same tree diagram, so it is already headed to Task 15's
+ *     manual review regardless of this fixup.
+ *
+ * Uses {@link DEPTH_PREFIX} — the same lookup rewritePaths uses — rather than
+ * a second hand-rolled copy, so an unrecognized `dest` fails loudly here too
+ * instead of silently reintroducing the "../../" fallback rewritePaths was
+ * just changed to reject.
+ *
+ * Fixed up here, before rewritePaths runs, so the generic
  * `.claude/docs/` -> `handbook/` mapping never sees the literal string and
  * cannot misroute it to a file that was never written there.
  * @param text - text being rewritten for one destination.
@@ -109,7 +139,8 @@ function recordBashSites(rawText, outPath) {
 const PIPELINE_YAML_REF = ".claude/docs/workflow-catalog.yaml";
 function fixupPipelineRefs(text, dest) {
   if (!text.includes(PIPELINE_YAML_REF)) return text;
-  const prefix = dest === DEST.ORCHESTRATION ? "%%GS_CONTENT_DIR%%" : dest === DEST.DOC ? "../" : "../../";
+  const prefix = DEPTH_PREFIX[dest];
+  if (prefix === void 0) throw new Error(`fixupPipelineRefs: unrecognized dest "${dest}"`);
   return text.split(PIPELINE_YAML_REF).join(`${prefix}pipeline/workflow-catalog.md`);
 }
 
@@ -219,13 +250,17 @@ for (const name of skillNames) {
   const [rawFm, rawBody] = splitFm(raw);
   // name ≡ dir (R12): the ported name feeds both the frontmatter and the
   // output path, so they can never drift apart.
-  // R7 (CLAUDE.md -> AGENTS.md) runs over the body via rewriteBody, but the
+  // R1 (Glob/Grep/WebSearch/WebFetch/TodoWrite/AskUserQuestion) and R7
+  // (CLAUDE.md -> AGENTS.md) both run over the body via rewriteBody, but the
   // frontmatter is assembled separately by transformSkillFrontmatter and
-  // never passes through it — a description mentioning "CLAUDE.md" (a real
-  // corpus site: gs-setup-engine's) would otherwise survive untouched. Reuse
-  // the same exported rule rather than hand-rolling a second CLAUDE.md rewrite.
+  // never passes through either — two real corpus sites survive untouched
+  // otherwise: gs-setup-engine's description mentions both "CLAUDE.md" and
+  // "WebSearch"; gs-consistency-check's mentions "Grep". R1's names never
+  // occur as English words, so applying it here is safe by that rule's own
+  // definition — reuse the exported rules rather than hand-rolling a second
+  // copy of either rewrite.
   const { frontmatter: skillFmRaw, routedRole } = transformSkillFrontmatter(rawFm, `gs-${name}`);
-  const frontmatter = rewriteClaudeMd(skillFmRaw);
+  const frontmatter = rewriteUnconditionalTools(rewriteClaudeMd(skillFmRaw));
   let body = rewriteBody(rawBody, DEST.SKILL);
   if (routedRole) body = appendRoutingLine(body, routedRole);
   // No extra "\n" here: splitFm preserves the original blank line (if any)
@@ -246,7 +281,9 @@ for (const name of roleNames) {
   const [rawFm, rawBody] = splitFm(raw);
   // CALLER CONTRACT (transformRoleFrontmatter): raw, pre-R1/R2 frontmatter in.
   const { frontmatter: roleFmRaw, advisory } = transformRoleFrontmatter(rawFm, name);
-  const frontmatter = rewriteClaudeMd(roleFmRaw);
+  // Same reasoning as the skill frontmatter above: R1 and R7 only run over
+  // the body via rewriteBody, so apply both here too.
+  const frontmatter = rewriteUnconditionalTools(rewriteClaudeMd(roleFmRaw));
   // R1/R2 run over the body BEFORE the advisory is spliced in, so the
   // advisory's quoted upstream tool list (Read, Glob, Grep, ...) is never
   // itself rewritten — splicing it earlier would let rewriteUnconditionalTools'
@@ -337,19 +374,30 @@ const guideRaw = readFileSync(join(snapshot, "docs/WORKFLOW-GUIDE.md"), "utf8");
 recordBashSites(guideRaw, "pipeline/workflow-guide.md");
 emit("pipeline/workflow-guide.md", rewriteBody(guideRaw, DEST.DOC));
 
-const pipelineCount = 2;
+// Derived from written, not hardcoded: the two emit() calls above are the
+// only writers under pipeline/, so this is the one G4 slot that would
+// actually catch a regression (a future third pipeline file, or one of the
+// two calls above being removed) instead of trivially passing forever.
+const pipelineCount = written.filter((f) => f.path.startsWith("pipeline/")).length;
 
 // ---------------------------------------------------------------------------
-// Gates. Any failure prints every problem and exits non-zero before the
-// manifest is written — a partial manifest describing a rejected port would
+// Gates. Every gate runs and every problem prints BEFORE any exit — a single
+// process.exit(1) per gate would make every later gate unreachable dead code
+// whenever an earlier one fails, and G3 legitimately fails on the real
+// corpus today (see the port report), so G4 and G1 must not depend on G3
+// passing to even run. Collected into one exit at the end instead. The
+// manifest write is still withheld on ANY failure — that is a separate,
+// deliberate decision: a partial manifest describing a rejected port would
 // itself be a stale artifact.
 // ---------------------------------------------------------------------------
 
+let anyGateFailed = false;
+
 const g3problems = checkReferentialIntegrity(written);
 if (g3problems.length > 0) {
+  anyGateFailed = true;
   console.error(`G3 referential integrity: ${g3problems.length} problem(s)`);
   for (const p of g3problems) console.error(`  ${p}`);
-  process.exit(1);
 }
 
 const skillDirs = readdirSync(join(OUT, "skills"), { withFileTypes: true })
@@ -370,25 +418,26 @@ const counts = {
 
 const g4problems = checkCounts(counts);
 if (g4problems.length > 0) {
+  anyGateFailed = true;
   console.error(`G4 counts: ${g4problems.length} problem(s)`);
   for (const p of g4problems) console.error(`  ${p}`);
-  process.exit(1);
 }
 
-// G1: the filesystem provider ships command-skill bodies verbatim, so a
-// %%GS_ marker under content/skills/** reaches the model unsubstituted with
-// no error at all.
-const g1problems = [];
-for (const { rel, full } of walkAll(join(OUT, "skills"))) {
-  if (readFileSync(full, "utf8").includes("%%GS_")) {
-    g1problems.push(`skills/${rel}: contains a %%GS_ substitution marker`);
-  }
-}
+// G1: re-read every file under content/skills/** from disk rather than
+// trusting `written` — disk is ground truth (it also correctly covers
+// gs-ping, which `written` never includes since the port never writes it).
+const skillFiles = walkAll(join(OUT, "skills")).map(({ rel, full }) => ({
+  path: `skills/${rel}`,
+  text: readFileSync(full, "utf8"),
+}));
+const g1problems = checkMarkerLeaks(skillFiles);
 if (g1problems.length > 0) {
+  anyGateFailed = true;
   console.error(`G1 marker leak: ${g1problems.length} problem(s)`);
   for (const p of g1problems) console.error(`  ${p}`);
-  process.exit(1);
 }
+
+if (anyGateFailed) process.exit(1);
 
 writeFileSync(MANIFEST_PATH, renderManifest({
   sha: UPSTREAM_SHA,

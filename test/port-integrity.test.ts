@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { rewritePaths } from "../tools/port/rules.mjs";
-import { checkCounts, checkReferentialIntegrity, EXPECTED_COUNTS, renderManifest } from "../tools/port/manifest.mjs";
+import { checkCounts, checkMarkerLeaks, checkReferentialIntegrity, EXPECTED_COUNTS, renderManifest } from "../tools/port/manifest.mjs";
 
 describe("G3 referential integrity", () => {
   it("passes when every reference resolves", () => {
@@ -90,6 +90,27 @@ describe("renderManifest reports the skills split behind the aggregate", () => {
     });
     expect(md).toContain("73 ported");
     expect(md).toContain("1 first-party");
+  });
+});
+
+describe("G1 no substitution marker under content/skills/**", () => {
+  it("passes when no skill file carries a marker", () => {
+    expect(checkMarkerLeaks([
+      { path: "skills/gs-ping/SKILL.md", text: "Read `references/probe.md` beside this skill." },
+    ])).toEqual([]);
+  });
+
+  it("flags a %%GS_ marker reaching a command skill", () => {
+    // The exact scenario a reviewer planted to prove sequential gate exit
+    // was hiding this gate: a genuine %%GS_CONTENT_DIR%%roles/producer.md
+    // line appended into content/skills/gs-ping/SKILL.md, which clearOwned()
+    // never touches and which G3's checks (command/role/.claude//CLAUDE.md)
+    // do not look for. Only a marker-specific check catches it.
+    const problems = checkMarkerLeaks([
+      { path: "skills/gs-ping/SKILL.md", text: "See %%GS_CONTENT_DIR%%roles/producer.md for the roster." },
+    ]);
+    expect(problems.join(" ")).toContain("skills/gs-ping/SKILL.md");
+    expect(problems.join(" ")).toContain("%%GS_");
   });
 });
 
