@@ -2,13 +2,16 @@ import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { isSkillName } from "@deepseek-ai/dsh-skill";
-import { checkNoMarkers, checkNoMarkersFlat, checkSkillDir, checkSkillRoot, contentDir } from "../src/content.js";
+import { checkNoMarkers, checkNoMarkersTree, checkSkillDir, checkSkillRoot, contentDir } from "../src/content.js";
 
 const fixtures = fileURLToPath(new URL("./fixtures/skills/", import.meta.url));
 const markerFixtures = fileURLToPath(new URL("./fixtures/marker-skills/", import.meta.url));
 const crlfFixtures = fileURLToPath(new URL("./fixtures/crlf-skills/", import.meta.url));
 const markerRoleFixtures = fileURLToPath(new URL("./fixtures/marker-roles/", import.meta.url));
 const crlfRoleFixtures = fileURLToPath(new URL("./fixtures/crlf-roles/", import.meta.url));
+const treeGoodFixtures = fileURLToPath(new URL("./fixtures/tree-good/", import.meta.url));
+const treeMarkerFixtures = fileURLToPath(new URL("./fixtures/tree-marker/", import.meta.url));
+const treeCrlfFixtures = fileURLToPath(new URL("./fixtures/tree-crlf/", import.meta.url));
 const read = (dir: string) => readFileSync(`${fixtures}${dir}/SKILL.md`, "utf8");
 
 describe("checkSkillDir", () => {
@@ -176,23 +179,59 @@ describe("G1 command skills must never carry a substitution marker", () => {
 describe("G1/G2 also cover flat role-brief roots (no SKILL.md nesting)", () => {
   // content/roles/ holds loose <role>.md files, not <name>/SKILL.md
   // directories — checkNoMarkers can't walk that shape (it statSync-skips
-  // non-directories), so this is the sibling checkNoMarkersFlat's job.
+  // non-directories), so this is the sibling checkNoMarkersTree's job.
   // Role briefs reach a delegated subagent with NO normalizing loader in
   // front of them at all — not even the CRLF-stripping the orchestration
   // loader does — so this gate is the only thing standing between a bad
   // checkout and a child model's context.
   it("flags a marker in a loose role brief", () => {
-    const problems = checkNoMarkersFlat(markerRoleFixtures);
+    const problems = checkNoMarkersTree(markerRoleFixtures);
     expect(problems.map((p) => p.kind)).toContain("marker-leak");
   });
 
   it("flags CRLF in a loose role brief", () => {
-    const problems = checkNoMarkersFlat(crlfRoleFixtures);
+    const problems = checkNoMarkersTree(crlfRoleFixtures);
     expect(problems.map((p) => p.kind)).toContain("crlf");
   });
 
   it("raises nothing for the real content/roles/ tree", () => {
-    const problems = checkNoMarkersFlat(`${contentDir()}roles/`);
+    const problems = checkNoMarkersTree(`${contentDir()}roles/`);
     expect(problems).toEqual([]);
+  });
+});
+
+describe("G1/G2 cover every content/ directory except orchestration/, at any nesting depth", () => {
+  // content/engines/<engine>/** nests one level deeper than content/roles/
+  // — checkNoMarkersTree must recurse, not assume a fixed depth. These
+  // fixtures mirror that shape: an engine-like top directory containing
+  // both a top-level doc and a doc nested two levels deep (engine/sub/doc).
+  it("raises nothing over a clean nested tree, at any depth", () => {
+    const problems = checkNoMarkersTree(treeGoodFixtures);
+    expect(problems).toEqual([]);
+  });
+
+  it("flags a marker leak nested two levels deep, with the nested relative path", () => {
+    const problems = checkNoMarkersTree(treeMarkerFixtures);
+    const leak = problems.find((p) => p.kind === "marker-leak");
+    expect(leak?.dir).toBe("engine-a/sub/leaky.md");
+  });
+
+  it("flags CRLF nested two levels deep, with the nested relative path", () => {
+    const problems = checkNoMarkersTree(treeCrlfFixtures);
+    const crlf = problems.find((p) => p.kind === "crlf");
+    expect(crlf?.dir).toBe("engine-a/sub/leaky.md");
+  });
+
+  // orchestration/ is the one directory that must NOT be scanned this way:
+  // it legitimately contains %%GS_ markers by design (substituted at load
+  // time by orchestration.ts, which does its own CRLF-normalize and
+  // fail-loud marker scan). Scanning it with checkNoMarkersTree would flag
+  // correct, as-shipped content — so this test asserts the opposite of
+  // every other test in this file: that the real orchestration/ tree DOES
+  // contain a marker, proving a lint that swept it in by mistake would
+  // fail the build on legitimate content, not just stay silent.
+  it("would wrongly flag the real orchestration/ tree if it were ever scanned this way", () => {
+    const problems = checkNoMarkersTree(`${contentDir()}orchestration/`);
+    expect(problems.map((p) => p.kind)).toContain("marker-leak");
   });
 });

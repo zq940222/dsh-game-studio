@@ -4,7 +4,7 @@
 *.webp binary
 
 # These fixtures' whole reason to exist is a literal CRLF (or bare CR)
-# checkout — they prove checkNoMarkers/checkNoMarkersFlat's G2 check fires
+# checkout — they prove checkNoMarkers/checkNoMarkersTree's G2 check fires
 # on real bytes. The blanket `eol=lf` above would silently normalize them
 # away on the next checkin, so each root is exempted and stored/checked out
 # byte-for-byte instead.
@@ -17,3 +17,4 @@
 # Any future rule added above this comment block re-triggers the same trap.
 test/fixtures/crlf-skills/** -text
 test/fixtures/crlf-roles/** -text
+test/fixtures/tree-crlf/** -text

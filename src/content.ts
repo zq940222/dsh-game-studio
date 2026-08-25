@@ -186,14 +186,14 @@ export function checkSkillRoot(root: string): SkillProblem[] {
 }
 
 /**
- * G1/G2: shared marker/CRLF scan over one file's already-read text. Both
- * command-skill bodies (`checkNoMarkers`) and flat role briefs
- * (`checkNoMarkersFlat`) are shipped VERBATIM with no substitution pass and
- * no fail-loud scan on either path, unlike the orchestration loader
- * (`orchestration.ts`'s `loadOrchestrationSkill` runs a `\r\n` -> `\n`
- * normalize and an `assertNoLeftoverMarker` throw before anything reaches a
- * model). A `%%GS_` marker here reaches the model unchanged with no error
- * at all.
+ * G1/G2: shared marker/CRLF scan over one file's already-read text. Command
+ * skills (`checkNoMarkers`) and everything else under `content/` except
+ * `orchestration/` (`checkNoMarkersTree`) are shipped VERBATIM with no
+ * substitution pass and no fail-loud scan on either path, unlike the
+ * orchestration loader (`orchestration.ts`'s `loadOrchestrationSkill` runs
+ * a CRLF-to-LF normalize and an `assertNoLeftoverMarker` throw before
+ * anything reaches a model). A `%%GS_` marker here reaches the model
+ * unchanged with no error at all.
  *
  * The CRLF half checks for a bare `\r`, not the `\r\n` pair: a lone `\r`
  * with no trailing `\n` injects the exact same control byte into
@@ -241,21 +241,42 @@ export function checkNoMarkers(root: string): SkillProblem[] {
 }
 
 /**
- * G1/G2 over a flat root: loose `<root>/<name>.md` files, one level deep —
- * the shape `content/roles/` uses. Role briefs are read by delegated
- * subagents at absolute paths with no normalizing loader in front of them
- * at all, so this is the only gate standing between a CRLF checkout or a
- * stray `%%GS_` marker and a child model's context.
- * @param root - a flat content root, trailing slash included.
- * @returns one problem per offending file.
+ * G1/G2 over any other content root, at any nesting depth: every `.md`
+ * file under `root`, recursively. This is the shape everything under
+ * `content/` uses once you leave `skills/` (dedicated coverage via
+ * `checkSkillRoot`/`checkNoMarkers` above, including the provider's own
+ * structural invariants, not just G1/G2) and `orchestration/` (excluded
+ * by the caller — loaded through `orchestration.ts`, which normalizes
+ * CRLF and fail-loud-scans for `%%GS_` residue itself, and which
+ * legitimately CONTAINS `%%GS_` markers by design, before substitution).
+ *
+ * Every one of those directories is model-facing text read verbatim at
+ * an absolute path, with no normalizing loader in front of it — the same
+ * three facts that justified `content/roles/` coverage apply unchanged
+ * to `content/handbook/`, `content/templates/`, `content/pipeline/`, and
+ * `content/engines/`. The shapes already differ (`roles/` is flat,
+ * `engines/<engine>/**` nests one level deeper, and future directories
+ * may nest differently still), so this walks recursively rather than
+ * assuming any fixed depth — a flat root is simply a tree with no
+ * subdirectories to recurse into, so this one function covers both.
+ * @param root - a content root, trailing slash included.
+ * @returns one problem per offending file. `dir` is the path relative to
+ *   `root` (forward-slash-joined), so a nested file stays identifiable —
+ *   e.g. "some-engine/sub/doc.md", not just "doc.md".
  */
-export function checkNoMarkersFlat(root: string): SkillProblem[] {
+export function checkNoMarkersTree(root: string): SkillProblem[] {
   const problems: SkillProblem[] = [];
-  for (const entry of readdirSync(root)) {
-    if (!entry.endsWith(".md")) continue;
-    const path = `${root}${entry}`;
-    if (statSync(path).isDirectory()) continue;
-    problems.push(...scanForLeaks(entry, readFileSync(path, "utf8")));
-  }
+  const walk = (relDir: string): void => {
+    for (const entry of readdirSync(`${root}${relDir}`)) {
+      const relPath = `${relDir}${entry}`;
+      if (statSync(`${root}${relPath}`).isDirectory()) {
+        walk(`${relPath}/`);
+        continue;
+      }
+      if (!entry.endsWith(".md")) continue;
+      problems.push(...scanForLeaks(relPath, readFileSync(`${root}${relPath}`, "utf8")));
+    }
+  };
+  walk("");
   return problems;
 }
