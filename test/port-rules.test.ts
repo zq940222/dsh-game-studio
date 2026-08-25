@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { COMMANDS, EXCLUDED_DOCS, ROLES, UPSTREAM_SHA, isCommand, isRole } from "../tools/port/inventory.mjs";
+import { findBashSites, rewriteStructuredTools, rewriteUnconditionalTools } from "../tools/port/rules.mjs";
 
 describe("inventory", () => {
   it("pins the upstream commit the port reproduces from", () => {
@@ -72,5 +73,70 @@ describe("inventory", () => {
     expect(() => {
       (role as any).tier = 99;
     }).toThrow();
+  });
+});
+
+describe("R1 unconditional tool names", () => {
+  it("rewrites names that are never English words", () => {
+    const out = rewriteUnconditionalTools(
+      "Use Glob and Grep, then WebSearch. Also WebFetch, TodoWrite, AskUserQuestion.",
+    );
+    expect(out).toBe(
+      "Use glob and grep, then web_search. Also web_fetch, todo_write, ask_user_question.",
+    );
+  });
+
+  it("leaves the English words alone", () => {
+    const prose = "Read the design doc, Write the summary, then Edit it.";
+    expect(rewriteUnconditionalTools(prose)).toBe(prose);
+  });
+});
+
+describe("R2 structured-position tool names", () => {
+  it("rewrites a backticked single tool name for Read, Write, and Edit", () => {
+    expect(rewriteStructuredTools("Call `Read` on the file.")).toBe("Call `read` on the file.");
+    expect(rewriteStructuredTools("`Write` then `Edit`.")).toBe("`write` then `edit`.");
+  });
+
+  it("rewrites an explicit 'X tool' phrase, including Task", () => {
+    expect(rewriteStructuredTools("Use the Read tool here.")).toBe("Use the read tool here.");
+    expect(rewriteStructuredTools("Delegate via the Task tool.")).toBe("Delegate via the subagent tool.");
+  });
+
+  it("does NOT rewrite a bare-backticked `Task` — it collides with C#/C++/.NET's async Task type", () => {
+    // Verbatim real-world site: agents/godot-csharp-specialist.md:205. `Task` here
+    // is .NET's async return type, not the delegation tool — rewriting it would
+    // produce "Return `subagent` for testable async methods...", which is nonsense.
+    const s = "- Return `Task` for testable async methods that callers need to await";
+    expect(rewriteStructuredTools(s)).toBe(s);
+  });
+
+  it("LEAVES PROSE UNTOUCHED — the whole point of this rule", () => {
+    const prose = [
+      "Read the existing ADR file completely.",
+      "1. **Read silently** — complete the full audit before presenting anything",
+      "Write a short summary, then Edit the draft.",
+      "Reading and writing are both fine.",
+      "The Task is to ship the vertical slice.",
+    ].join("\n");
+    expect(rewriteStructuredTools(prose)).toBe(prose);
+  });
+
+  it("does not touch a backticked phrase that merely contains a tool name", () => {
+    const s = "See `Read the docs` for details.";
+    expect(rewriteStructuredTools(s)).toBe(s);
+  });
+});
+
+describe("R3 Bash sites are reported, never rewritten", () => {
+  it("reports each site with its line number and leaves the text alone", () => {
+    const text = "line one\nRun Bash to build.\nnothing here\nUse `Bash` carefully.\n";
+    const sites = findBashSites(text);
+    expect(sites).toEqual([
+      { line: 2, text: "Run Bash to build." },
+      { line: 4, text: "Use `Bash` carefully." },
+    ]);
+    expect(rewriteUnconditionalTools(text)).toBe(text);
+    expect(rewriteStructuredTools(text)).toBe(text);
   });
 });
