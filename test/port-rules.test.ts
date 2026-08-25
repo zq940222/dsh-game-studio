@@ -41,4 +41,36 @@ describe("inventory", () => {
     expect(isRole("gameplay-programmer")).toBe(true);
     expect(isRole("gameplay")).toBe(false);
   });
+
+  it("assigns each role to a non-empty department", () => {
+    Object.entries(ROLES).forEach(([name, role]) => {
+      expect(role.department).toBeTruthy();
+      expect(typeof role.department).toBe("string");
+      expect(role.department.length).toBeGreaterThan(0);
+    });
+  });
+
+  it("classifies roles coherently by department", () => {
+    // Directors resolve to leadership
+    expect(ROLES["producer"]!.department).toBe("leadership");
+
+    // Audio roles both resolve to audio
+    expect(ROLES["audio-director"]!.department).toBe("audio");
+    expect(ROLES["sound-designer"]!.department).toBe("audio");
+
+    // Design-domain roles resolve to design
+    expect(ROLES["game-designer"]!.department).toBe("design");
+    expect(ROLES["level-designer"]!.department).toBe("design");
+    expect(ROLES["ux-designer"]!.department).toBe("design");
+
+    // Engineering roles resolve to engineering
+    expect(ROLES["gameplay-programmer"]!.department).toBe("engineering");
+  });
+
+  it("deep-freezes nested role objects to prevent mutation", () => {
+    const role = ROLES["gameplay-programmer"]!;
+    expect(() => {
+      (role as any).tier = 99;
+    }).toThrow();
+  });
 });

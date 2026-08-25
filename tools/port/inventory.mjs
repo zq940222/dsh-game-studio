@@ -57,8 +57,9 @@ const SPECIALISTS = [
 function departmentOf(name) {
   if (DIRECTORS.includes(name)) return "leadership";
   if (name.includes("programmer") || name.includes("engineer") || name.endsWith("-specialist")) return "engineering";
+  if (name.includes("audio") || name.includes("sound")) return "audio";
+  if (name.includes("art")) return "art";
   if (name.includes("design")) return "design";
-  if (name.includes("art") || name.includes("audio") || name.includes("sound")) return "art";
   if (name.includes("qa") || name.includes("test")) return "qa";
   if (name.includes("narrative") || name === "writer") return "narrative";
   return "production";
@@ -66,9 +67,9 @@ function departmentOf(name) {
 
 /** The 49 role briefs, with the delegation tier each one sits at. */
 export const ROLES = Object.freeze(Object.fromEntries([
-  ...DIRECTORS.map((n) => [n, { tier: 1, department: departmentOf(n) }]),
-  ...LEADS.map((n) => [n, { tier: 2, department: departmentOf(n) }]),
-  ...SPECIALISTS.map((n) => [n, { tier: 3, department: departmentOf(n) }]),
+  ...DIRECTORS.map((n) => [n, Object.freeze({ tier: 1, department: departmentOf(n) })]),
+  ...LEADS.map((n) => [n, Object.freeze({ tier: 2, department: departmentOf(n) })]),
+  ...SPECIALISTS.map((n) => [n, Object.freeze({ tier: 3, department: departmentOf(n) })]),
 ]));
 
 /**
