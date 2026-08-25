@@ -107,7 +107,7 @@ Common blockers:
 ## File Write Protocol
 
 All file writes (narrative docs, dialogue files, lore entries) are delegated to
-sub-agents spawned via a subagent. Each sub-agent enforces the "May I write to [path]?"
+sub-agents. Each sub-agent enforces the "May I write to [path]?"
 protocol. This orchestrator does not write files directly.
 
 ## Output

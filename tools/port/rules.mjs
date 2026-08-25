@@ -112,7 +112,28 @@ const COMPOUND_PHRASES = Object.freeze([
 // that changes a file's line count without report.mjs feeding the delta
 // back in — the way the frontmatter-regeneration delta is — could, if that
 // changed, misreport a later Bash site's line by one).
+// `sub-agents\s+spawned\s+via\s+Task` MUST run before the generic
+// `via\s+Task` entry below (array order == application order in the
+// for-loop in rewriteStructuredTools), or the generic entry fires first and
+// leaves "sub-agents spawned via a subagent" — a plural noun echoing right
+// back into the singular article the generic rule inserts, the exact
+// "review round" defect class as gs-gate-check/gs-brainstorm/director-
+// gates.md (fixed as one-off fixupClaudeDocResidue overrides, since those
+// three each needed a different surrounding rewrite) and gs-design-system/
+// gs-code-review (found the same way, fixed the same way — see port.mjs).
+// This one is corpus-wide instead: the EXACT phrase "sub-agents spawned via
+// Task" recurs identically in 7 files (gs-dev-story, gs-team-audio,
+// gs-team-combat, gs-team-level, gs-team-live-ops, gs-team-narrative,
+// gs-team-polish), always immediately followed by ". Each sub-agent
+// enforces..." — verified unwrapped in all 7 (grep across the raw upstream
+// tree), so a literal-shaped regex has no mid-phrase-wrap gap to worry
+// about, the same check the 35-site R14 "rules/hooks" fix and this array's
+// own `Task\s+agents` entry both document. Dropping "spawned via Task"
+// entirely (not rewording to "via a subagent") reads cleanly in all 7,
+// since "sub-agents" alone already names the mechanism and the very next
+// sentence ("Each sub-agent enforces...") still carries it.
 const TASK_DELEGATION_PHRASES = Object.freeze([
+  [/\bsub-agents\s+spawned\s+via\s+Task\b/g, "sub-agents"],
   [/\bvia\s+Task\b/g, "via a subagent"],
   [/\bTask\s+calls\b/g, "subagent calls"],
   [/\bTask\s+agents\b/g, "subagents"],

@@ -170,7 +170,7 @@ art-dir = art-director
 3. producer           -- Daily status with /gs-sprint-plan status
 4. qa-lead            -- Continuous testing during sprint
 5. lead-programmer    -- Continuous code review during sprint
-6. producer           -- Sprint retrospective with post-sprint hook
+6. producer           -- Sprint retrospective with /gs-retrospective
 7. producer           -- Plans next sprint incorporating learnings
 ```
 

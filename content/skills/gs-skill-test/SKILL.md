@@ -12,7 +12,7 @@ metadata:
 
 Validates `../../skills/gs-*/SKILL.md` files for structural compliance and
 behavioral correctness. No external dependencies — runs entirely within the
-existing skill/hook/template architecture.
+existing skill/template architecture.
 
 **Four modes:**
 
@@ -89,14 +89,14 @@ The skill must end with a recommended next action or follow-up path. Look for:
 **WARN** if absent.
 
 ### Check 6 — Fork Context Complexity
-If frontmatter contains `context: fork`, the skill should have ≥5 phase headings
+If the skill's `metadata:` block contains `context: fork` (no ported skill currently sets it), the skill should have ≥5 phase headings
 (`##` level or numbered Phase N headers). Fork context is for complex multi-phase
 skills; simple skills should not use it.
 
 **WARN** if `context: fork` is set but fewer than 5 phases found.
 
 ### Check 7 — Argument Hint Plausibility
-`argument-hint` must be non-empty. If the skill body mentions multiple modes
+`argument-hint` (nested under `metadata:`, not top-level -- see Check 1) must be non-empty. If the skill body mentions multiple modes
 (e.g., "Mode A | Mode B"), the hint should reflect them. Cross-reference the
 hint against the first phase's "Parse Arguments" section.
 

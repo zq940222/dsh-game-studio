@@ -164,7 +164,7 @@ After all subagent outputs are collected, spawn `level-designer` via a subagent 
 ## File Write Protocol
 
 All file writes (level design docs, narrative docs, test checklists) are delegated
-to sub-agents spawned via a subagent. Each sub-agent enforces the "May I write to [path]?"
+to sub-agents. Each sub-agent enforces the "May I write to [path]?"
 protocol. This orchestrator does not write files directly.
 
 Verdict: **COMPLETE** — level design document produced and all team outputs compiled.

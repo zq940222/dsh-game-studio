@@ -127,7 +127,7 @@ Common blockers:
 ## File Write Protocol
 
 All file writes (performance reports, test results, evidence docs) are delegated to
-sub-agents spawned via a subagent. Each sub-agent enforces the "May I write to [path]?"
+sub-agents. Each sub-agent enforces the "May I write to [path]?"
 protocol. This orchestrator does not write files directly.
 
 ## Output

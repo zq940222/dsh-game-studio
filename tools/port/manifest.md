@@ -39,9 +39,6 @@ Upstream: `984023d`
 - settings-local-template.md
 - setup-requirements.md
 
-## Bash sites needing manual rewrite (4)
+## Bash sites needing manual rewrite (1)
 
-- skills/gs-hotfix/SKILL.md:74 — `Bash: git rev-parse --is-inside-work-tree 2>/dev/null`
-- skills/gs-retrospective/SKILL.md:61 — Run git log for the sprint period to understand what was actually committed and when. Use the Bash tool (which uses Git Bash on Windows — the `2>/dev/null` is bash syntax, not PowerShell):
-- skills/gs-retrospective/SKILL.md:64 — Bash: git log --oneline --since="4 weeks ago" 2>/dev/null || git log --oneline -20
 - pipeline/workflow-guide.md:39 — - **Git** with Git Bash (Windows) or standard terminal (Mac/Linux)

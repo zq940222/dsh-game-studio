@@ -599,11 +599,25 @@ function fixupClaudeDocResidue(text, outName) {
     );
   }
   if (outName === "gs-story-done") {
-    return text.split(
+    let out = text.split(
       "- **Test pass check**: if a test file path is mentioned, run it via `Bash`.",
     ).join(
       "- **Test pass check**: if a test file path is mentioned, run it via the shell tool (`bash` on POSIX, `pwsh` on Windows).",
     );
+    // Review-round finding (Important 1): an AFFIRMATIVE claim that a
+    // hook actively runs today, the same defect class already fixed
+    // throughout workflow-guide.md. `validate-commit.sh` is one of the
+    // 12 upstream PreToolUse hooks (its own reference doc is in
+    // EXCLUDED_DOCS); NOTICE says none of the 12 execute here. Redirect
+    // to NOTICE and turn the promised automatic check into a manual one,
+    // matching the phrasing already used for context-management.md and
+    // workflow-guide.md's hook-residue fixes.
+    out = out.split(
+      "The `validate-commit.sh` hook will verify design doc references and check for hardcoded values automatically.",
+    ).join(
+      "There is no commit-validation hook on this harness to do this automatically (see `NOTICE`) — verify design doc references and check for hardcoded values yourself before running this commit.",
+    );
+    return out;
   }
   if (outName === "gs-brainstorm") {
     // Delegation-idiom nit (charter item 2), same shape as gs-gate-check
@@ -664,7 +678,16 @@ function fixupClaudeDocResidue(text, outName) {
   // at top level, so the rewritten Check 1 field list holds for it as well
   // — this fix does not need a second gs-ping-specific carve-out.
   if (outName === "gs-skill-test") {
-    let out = text.split([
+    // Important 2 (review round): this skill's own opening description
+    // names "hook" as part of its architecture — the same residual-machinery
+    // problem the rest of this block's Check 1/6/7 fixes address, just in
+    // prose rather than a checklist item.
+    let out = text.split(
+      "existing skill/hook/template architecture.",
+    ).join(
+      "existing skill/template architecture.",
+    );
+    out = out.split([
       "The file must contain all of these in the YAML frontmatter block:",
       "- `name:`",
       "- `description:`",
@@ -686,6 +709,25 @@ function fixupClaudeDocResidue(text, outName) {
       "fields live inside a nested `metadata:` block instead of top-level — check",
       "for them there, not as a sibling of `name:`.)",
     ].join("\n"));
+    // Follow-through: Check 6 and Check 7 have the identical root cause as
+    // the allowed-tools defect above -- both validate frontmatter shaped
+    // like upstream's, not what this port actually emits -- silent until
+    // now only because both are WARN paths that simply never fire, rather
+    // than an always-FAIL like Check 1/4. `context: fork` never occurs
+    // anywhere in this corpus (upstream or ported), so Check 6 is dormant
+    // either way; the fix is pointing it at the right nesting level for
+    // the day a skill does carry it. `argument-hint` is real and present
+    // on every ported skill, but under `metadata:`, not top-level.
+    out = out.split(
+      "If frontmatter contains `context: fork`, the skill should have ≥5 phase headings",
+    ).join(
+      "If the skill's `metadata:` block contains `context: fork` (no ported skill currently sets it), the skill should have ≥5 phase headings",
+    );
+    out = out.split(
+      "`argument-hint` must be non-empty. If the skill body mentions multiple modes",
+    ).join(
+      "`argument-hint` (nested under `metadata:`, not top-level -- see Check 1) must be non-empty. If the skill body mentions multiple modes",
+    );
     out = out.split(
       "**FAIL** if `allowed-tools` includes `Write` or `Edit` but no ask-before-write language is found.",
     ).join(
@@ -694,10 +736,85 @@ function fixupClaudeDocResidue(text, outName) {
     return out;
   }
   if (outName === "gs-skill-improve") {
-    return text.split(
+    let out = text.split(
       "- **Check 4 fail** → Write or Edit in allowed-tools but no ask-before-write language",
     ).join(
       "- **Check 4 fail** → the skill instructs writing or editing files but has no ask-before-write language",
+    );
+    // Follow-through: same root-cause fix as gs-skill-test's Check 6/7
+    // above, mirrored here since this diagnosis table repeats both checks
+    // verbatim.
+    out = out.split(
+      "- **Check 6 warn** → `context: fork` set but fewer than 5 phases found",
+    ).join(
+      "- **Check 6 warn** → `metadata.context: fork` set but fewer than 5 phases found",
+    );
+    out = out.split(
+      "- **Check 7 warn** → argument-hint is empty or doesn't match documented modes",
+    ).join(
+      "- **Check 7 warn** → `metadata.argument-hint` is empty or doesn't match documented modes",
+    );
+    return out;
+  }
+  // Review-round reclassification: gs-retrospective:61/64 and
+  // gs-hotfix:74 were originally left in the manual Bash-sites ledger as
+  // "Git Bash the shell", but both name the AGENT'S TOOL, not a human's
+  // shell -- the test is whether the sentence names the tool or the shell
+  // a human is typing into, and both of these are instructions FROM the
+  // skill TO the model, not a human-facing prerequisites list (that
+  // distinction is what correctly keeps workflow-guide.md:39 classified
+  // as the shell). Fixed the same way as the five originally-caught R3
+  // sites, and the `2>/dev/null` POSIX-only redirection dropped outright
+  // rather than given a pwsh equivalent -- neither command relies on
+  // stderr being suppressed for its `||` fallback or its "fails or
+  // returns empty" check to work, so removing it is the minimal fix that
+  // does not need a second, platform-conditional command variant.
+  if (outName === "gs-hotfix") {
+    return text.split(
+      "Check whether this is a git repository:\n\n`Bash: git rev-parse --is-inside-work-tree 2>/dev/null`",
+    ).join(
+      "Check whether this is a git repository, using the shell tool (`bash` on POSIX, `pwsh` on Windows):\n\n`git rev-parse --is-inside-work-tree`",
+    );
+  }
+  if (outName === "gs-retrospective") {
+    let out = text.split(
+      "Use the Bash tool (which uses Git Bash on Windows — the `2>/dev/null` is bash syntax, not PowerShell):",
+    ).join(
+      "Use the shell tool (`bash` on POSIX, `pwsh` on Windows):",
+    );
+    out = out.split(
+      'Bash: git log --oneline --since="4 weeks ago" 2>/dev/null || git log --oneline -20',
+    ).join(
+      'git log --oneline --since="4 weeks ago" || git log --oneline -20',
+    );
+    return out;
+  }
+  // Follow-through: the 7-site "sub-agents spawned via Task" pattern is
+  // handled corpus-wide as a TASK_DELEGATION_PHRASES regex entry in
+  // rules.mjs (verified unwrapped on all 7, same check as the 35-site
+  // R14 fix). gs-dev-story additionally has ONE site of a different,
+  // non-repeating shape -- "agent(s) via Task" -- not worth a second
+  // corpus-wide regex for a single occurrence, so it is a literal here.
+  if (outName === "gs-dev-story") {
+    return text.split(
+      "Spawn the chosen programmer agent(s) via Task with the full context package:",
+    ).join(
+      "Spawn the chosen programmer agent(s) with the full context package:",
+    );
+  }
+  if (outName === "agent-coordination-map.md") {
+    // Same defect class as gs-story-done's validate-commit.sh fix above:
+    // "post-sprint hook" names upstream machinery this harness does not
+    // execute. Unlike that site, this is a workflow-pattern diagram whose
+    // five sibling steps all name a real `/command` instead of prose --
+    // replacing the dead hook reference with `/retrospective` (a real,
+    // whitelisted command R4 prefixes to `/gs-retrospective`) matches the
+    // diagram's own established pattern rather than just deleting the
+    // clause.
+    return text.split(
+      "6. producer           -- Sprint retrospective with post-sprint hook",
+    ).join(
+      "6. producer           -- Sprint retrospective with /retrospective",
     );
   }
   return text;

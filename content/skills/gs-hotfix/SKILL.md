@@ -69,9 +69,9 @@ If yes, write the file, creating the directory if needed.
 
 ## Phase 3: Create Hotfix Branch
 
-Check whether this is a git repository:
+Check whether this is a git repository, using the shell tool (`bash` on POSIX, `pwsh` on Windows):
 
-`Bash: git rev-parse --is-inside-work-tree 2>/dev/null`
+`git rev-parse --is-inside-work-tree`
 
 If this command fails or returns empty: note "Not a git repository — create the branch manually." and skip branch creation.
 

@@ -144,7 +144,7 @@ If a BLOCKED state is unresolvable, end with Verdict: **BLOCKED** instead of COM
 ## File Write Protocol
 
 All file writes (season design docs, analytics plans, communication calendars) are
-delegated to sub-agents spawned via a subagent. Each sub-agent enforces the
+delegated to sub-agents. Each sub-agent enforces the
 "May I write to [path]?" protocol. This orchestrator does not write files directly.
 
 ## Output

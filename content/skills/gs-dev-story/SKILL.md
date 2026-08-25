@@ -175,7 +175,7 @@ assumptions about post-cutoff engine APIs that need expert verification.
 
 ## Phase 4: Implement
 
-Spawn the chosen programmer agent(s) via a subagent with the full context package:
+Spawn the chosen programmer agent(s) with the full context package:
 
 Brief the agent with file paths and targeted reading instructions — do not serialize document content into the subagent prompt. The agent reads what it needs directly:
 
@@ -298,7 +298,7 @@ Common blockers:
 
 ## Collaborative Protocol
 
-- **File writes are delegated** — all source code, test files, and evidence docs are written by sub-agents spawned via a subagent. Each sub-agent enforces the "May I write to [path]?" protocol individually. This orchestrator does not write files directly.
+- **File writes are delegated** — all source code, test files, and evidence docs are written by sub-agents. Each sub-agent enforces the "May I write to [path]?" protocol individually. This orchestrator does not write files directly.
 - **Load before implementing** — do not start coding until all context is loaded
   (story, TR-ID, ADR, manifest, engine prefs). Incomplete context produces code
   that drifts from design.

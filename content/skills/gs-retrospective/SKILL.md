@@ -58,10 +58,10 @@ If the user chooses [B], stop here.
 
 Extract: planned tasks, estimated effort, owners, and goals.
 
-Run git log for the sprint period to understand what was actually committed and when. Use the Bash tool (which uses Git Bash on Windows — the `2>/dev/null` is bash syntax, not PowerShell):
+Run git log for the sprint period to understand what was actually committed and when. Use the shell tool (`bash` on POSIX, `pwsh` on Windows):
 
 ```
-Bash: git log --oneline --since="4 weeks ago" 2>/dev/null || git log --oneline -20
+git log --oneline --since="4 weeks ago" || git log --oneline -20
 ```
 
 Adjust the `--since` date to match the sprint duration if known from the sprint plan.

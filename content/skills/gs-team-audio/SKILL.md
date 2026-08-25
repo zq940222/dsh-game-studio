@@ -118,7 +118,7 @@ Verdict: **BLOCKED** — [reason]
 ## File Write Protocol
 
 All file writes (audio design docs, SFX specs, implementation files) are delegated
-to sub-agents spawned via a subagent. Each sub-agent enforces the "May I write to [path]?"
+to sub-agents. Each sub-agent enforces the "May I write to [path]?"
 protocol. This orchestrator does not write files directly.
 
 ## Next Steps
