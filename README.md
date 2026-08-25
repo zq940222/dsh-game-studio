@@ -19,22 +19,26 @@ ported as blocking gates. They are checklists, approval prompts, and
 reminders. Nothing here will stop a bad commit — it will only tell you
 about it.
 
-## Current state: Phase 1 skeleton
+## Current state: Phase 2 — the full studio
 
-This is a Phase 1 skeleton, not the full port. What is actually installed
-today:
+This is the full port, not a skeleton. What is installed today:
 
-- `gs-ping` — a command skill (an install probe; reachable from the `/`
-  menu, not visible to the model)
 - `gs-studio` and `gs-roster` — orchestration skills (visible to the model,
   registered at runtime with this installation's absolute content path
   substituted in)
-- `creative-director` — one role brief, used as the delegation-chain probe
+- 74 command skills reachable from the `/` menu, not visible to the model:
+  the 73 studio commands plus `gs-ping`, this phase's own install probe
+- 49 role briefs, one file per role, plus a generated `roles/_index.md`
+  roster the port produces
+- 40 document templates, 11 path-scoped coding-standard rule files, 46
+  per-engine reference docs (Godot / Unity / Unreal), and 12 handbook
+  documents (roster, gates, coordination rules)
+- the 7-phase pipeline guide and catalog under `pipeline/`
 
-The full port — 49 role briefs, 73 studio commands, 41 document templates,
-11 coding-standard rule files, the per-engine reference handbooks, and the
-guard / model-tier layers — lands in later phases. If you go looking for
-`/gs-start` or a `game-designer` role brief today, they are not there yet.
+`/gs-start` and the `game-designer` role brief are both there today. What
+is still ahead is active pipeline-stage enforcement and the guard /
+model-tier layer — see Configuration below for exactly which keys this
+phase implements.
 
 ## Installation
 
@@ -99,7 +103,7 @@ id this package's own `cordis.patch.yml` inserts:
 
 | Key | Type | Default | What it does today |
 |---|---|---|---|
-| `engine` | `"auto" \| "godot" \| "unity" \| "ue5"` | `"auto"` | Substituted into the `gs-studio` orientation skill as the active engine. The per-engine reference handbooks it will eventually select between are not shipped yet (Phase 2). |
+| `engine` | `"auto" \| "godot" \| "unity" \| "ue5"` | `"auto"` | Substituted into the `gs-studio` orientation skill as the active engine. The per-engine reference handbooks (`content/engines/`) are shipped; automatic selection between them by this value is not wired up yet. |
 | `reviewIntensity` | `"full" \| "lean" \| "solo"` | `"full"` | Substituted into the `gs-studio` orientation skill as the active review intensity. The pipeline stages that will act on it are not shipped yet (Phase 3). |
 | `watch` | `boolean` | `false` | Re-scans `content/skills/` for changes without restarting the harness. The shipped content is immutable — leave this `false` unless you are developing this plugin itself. |
 
@@ -117,9 +121,9 @@ that profile, including ordinary coding sessions that have nothing to do
 with game development. They add to every session's skill listing whether
 you use them or not.
 
-The command skills (`gs-ping` today, 73 more once Phase 2 lands) do not
-carry this cost — `disable-model-invocation: true` keeps them out of the
-model's catalog entirely. They do still show up in the `/` menu, though;
+The command skills (74 total — the 73 studio commands plus `gs-ping`) do
+not carry this cost — `disable-model-invocation: true` keeps them out of
+the model's catalog entirely. They do still show up in the `/` menu, though;
 type `/gs` there to filter them out of the rest of the list.
 
 If you would rather not pay that cost on your daily-driver profile, use
