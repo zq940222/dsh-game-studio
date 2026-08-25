@@ -15,6 +15,8 @@
  * @module tools/port/rules
  */
 
+import { isCommand, isRole } from "./inventory.mjs";
+
 /** Tool names that never occur as English words in the upstream corpus. */
 const UNCONDITIONAL = Object.freeze({
   Glob: "glob",
@@ -122,4 +124,43 @@ export function findBashSites(text) {
     sites.push({ line: i + 1, text: line });
   });
   return sites;
+}
+
+/**
+ * R4/R12: prefix slash commands, whitelist-driven.
+ *
+ * The upstream corpus carries 997 slash-shaped strings and only a fraction
+ * are commands; the rest are paths, ratios, and URL segments. Consulting the
+ * whitelist is what makes those immune instead of collateral damage. Applies
+ * to frontmatter values too, since `description:` also names commands.
+ * @param text - one file's full text.
+ * @returns the text with every known command prefixed exactly once.
+ */
+export function rewriteCommands(text) {
+  return text.replace(/(?<![\w/-])\/([a-z][a-z0-9-]*)/g, (match, name) =>
+    isCommand(name) ? `/gs-${name}` : match,
+  );
+}
+
+/**
+ * R5: rewrite Claude Code's `subagent_type:` into the harness's delegation
+ * shape, where the child reads its own role brief rather than having it
+ * pasted into the prompt.
+ *
+ * A bracketed placeholder keeps its placeholder meaning — it names a class of
+ * specialist, not a role file. An unrecognized role is left verbatim so the
+ * manifest's referential-integrity gate reports it instead of the rule
+ * silently inventing a path.
+ * @param text - one file's full text.
+ * @returns the rewritten text.
+ */
+export function rewriteDelegation(text) {
+  return text.replace(/`subagent_type:\s*([^`]+)`/g, (match, raw) => {
+    const value = raw.trim();
+    if (value.startsWith("[")) {
+      return `a subagent for \`${value}\` (the child reads its own brief under \`roles/\`)`;
+    }
+    if (!isRole(value)) return match;
+    return `delegate to \`${value}\` (the child reads \`roles/${value}.md\` itself)`;
+  });
 }

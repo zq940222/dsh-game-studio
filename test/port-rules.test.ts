@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { COMMANDS, EXCLUDED_DOCS, ROLES, UPSTREAM_SHA, isCommand, isRole } from "../tools/port/inventory.mjs";
-import { findBashSites, rewriteStructuredTools, rewriteUnconditionalTools } from "../tools/port/rules.mjs";
+import {
+  findBashSites,
+  rewriteCommands,
+  rewriteDelegation,
+  rewriteStructuredTools,
+  rewriteUnconditionalTools,
+} from "../tools/port/rules.mjs";
 
 describe("inventory", () => {
   it("pins the upstream commit the port reproduces from", () => {
@@ -197,5 +203,53 @@ describe("R3 Bash sites are reported, never rewritten", () => {
     ].join("\n");
     const sites = findBashSites(text);
     expect(sites).toEqual([{ line: 6, text: "Run Bash to build the project." }]);
+  });
+});
+
+describe("R4 command names are whitelist-driven", () => {
+  it("prefixes a known command", () => {
+    expect(rewriteCommands("Run /dev-story then /story-done.")).toBe(
+      "Run /gs-dev-story then /gs-story-done.",
+    );
+  });
+
+  it("leaves slash-shaped strings that are not commands", () => {
+    const s = "Write to /tmp/out, check the 3/4 ratio, see https://x.dev/docs/start here.";
+    expect(rewriteCommands(s)).toBe(s);
+  });
+
+  it("does not prefix a command name that merely starts like one", () => {
+    expect(rewriteCommands("/starting is not a command")).toBe("/starting is not a command");
+  });
+
+  it("does not double-prefix an already-ported command", () => {
+    expect(rewriteCommands("/gs-start")).toBe("/gs-start");
+  });
+
+  it("rewrites inside backticks and inside frontmatter values alike", () => {
+    expect(rewriteCommands("See `/qa-plan` first.")).toBe("See `/gs-qa-plan` first.");
+    expect(rewriteCommands("description: Runs after /smoke-check.")).toBe(
+      "description: Runs after /gs-smoke-check.",
+    );
+  });
+});
+
+describe("R5 delegation", () => {
+  it("turns a concrete subagent_type into the self-read delegation form", () => {
+    expect(rewriteDelegation("- `subagent_type: lead-programmer` — Review the fix")).toBe(
+      "- delegate to `lead-programmer` (the child reads `roles/lead-programmer.md` itself) — Review the fix",
+    );
+  });
+
+  it("preserves a placeholder rather than treating it as a role name", () => {
+    const s = "Spawn `subagent_type: [primary specialist]` with the ADR section";
+    expect(rewriteDelegation(s)).toBe(
+      "Spawn a subagent for `[primary specialist]` (the child reads its own brief under `roles/`) with the ADR section",
+    );
+  });
+
+  it("leaves an unknown role untouched so the manifest can flag it", () => {
+    const s = "`subagent_type: nonexistent-role`";
+    expect(rewriteDelegation(s)).toBe(s);
   });
 });
