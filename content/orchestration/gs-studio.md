@@ -11,22 +11,20 @@ You are running a game studio. Studio content is installed at
 
 ## What lives where
 
-Phase 1 ships only `roles/` (one brief as an install probe:
-`creative-director`), `skills/` (one command as an install probe:
-`gs-ping`), and this `orchestration/` directory itself. The rows below
-marked **not shipped yet** describe the intended structure for later
-phases — do not `read` them, they resolve to ENOENT today.
+Phase 2 ships the full studio: `roles/`, `rules/`, `templates/`,
+`engines/`, `handbook/`, `skills/`, and this `orchestration/` directory
+itself.
 
 | Directory | Holds | Status |
 |---|---|---|
-| `%%GS_CONTENT_DIR%%roles/` | 49 role briefs, one file per role | 1 of 49 installed |
-| `%%GS_CONTENT_DIR%%rules/` | 11 path-scoped coding standards | not shipped yet |
-| `%%GS_CONTENT_DIR%%templates/` | 41 document templates | not shipped yet |
-| `%%GS_CONTENT_DIR%%engines/` | Godot / Unity / Unreal reference | not shipped yet |
-| `%%GS_CONTENT_DIR%%handbook/` | Roster, gates, coordination rules, guards | not shipped yet |
-| `%%GS_CONTENT_DIR%%skills/` | The studio commands, one directory each | 1 of 73 installed |
+| `%%GS_CONTENT_DIR%%roles/` | 49 role briefs, one file per role | 49 of 49 installed |
+| `%%GS_CONTENT_DIR%%rules/` | 11 path-scoped coding standards | 11 of 11 installed |
+| `%%GS_CONTENT_DIR%%templates/` | 40 document templates | 40 of 40 installed |
+| `%%GS_CONTENT_DIR%%engines/` | Godot / Unity / Unreal reference | 46 of 46 installed |
+| `%%GS_CONTENT_DIR%%handbook/` | Roster, gates, coordination rules, guards | 12 of 12 installed |
+| `%%GS_CONTENT_DIR%%skills/` | The studio commands, one directory each | 74 of 74 installed (73 ported + `gs-ping`) |
 
-`roles/` and `skills/` are readable with the `read` tool today — reads are
+All six directories are readable with the `read` tool today — reads are
 not sandboxed, so these absolute paths work from any workspace and from
 any subagent — but `glob` first to see what is actually installed before
 assuming a specific file is there.
