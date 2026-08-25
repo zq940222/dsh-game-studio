@@ -271,8 +271,21 @@ const PATH_MAP = Object.freeze([
  * @param dest - one of {@link DEST}.
  * @returns the text with upstream paths redirected.
  */
+const DEPTH_PREFIX = Object.freeze({
+  [DEST.ORCHESTRATION]: "%%GS_CONTENT_DIR%%",
+  [DEST.DOC]: "../",
+  [DEST.SKILL]: "../../",
+  [DEST.DOC_NESTED]: "../../",
+});
+
 export function rewritePaths(text, dest) {
-  const prefix = dest === DEST.ORCHESTRATION ? "%%GS_CONTENT_DIR%%" : dest === DEST.DOC ? "../" : "../../";
+  const prefix = DEPTH_PREFIX[dest];
+  // Fail loud on an unrecognized dest instead of silently falling through to
+  // "../../" — that fallback used to produce the wrong depth for a DOC-class
+  // file with nothing to catch it, the exact defect Task 10 fixed once
+  // already. A future caller passing a typo'd or new dest gets an error
+  // here instead of a link that resolves nowhere.
+  if (prefix === void 0) throw new Error(`rewritePaths: unrecognized dest "${dest}"`);
   let out = text;
   for (const [from, to] of PATH_MAP) {
     out = out.split(from).join(prefix + to);
