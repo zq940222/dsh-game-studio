@@ -186,10 +186,41 @@ export function checkSkillRoot(root: string): SkillProblem[] {
 }
 
 /**
- * G1/G2: command-skill bodies are shipped VERBATIM by the filesystem provider —
- * there is no substitution pass and no fail-loud scan on this path, unlike the
- * orchestration loader. A `%%GS_` marker here would reach the model unchanged
- * with no error at all, and a CRLF checkout would inject `\r` throughout.
+ * G1/G2: shared marker/CRLF scan over one file's already-read text. Both
+ * command-skill bodies (`checkNoMarkers`) and flat role briefs
+ * (`checkNoMarkersFlat`) are shipped VERBATIM with no substitution pass and
+ * no fail-loud scan on either path, unlike the orchestration loader
+ * (`orchestration.ts`'s `loadOrchestrationSkill` runs a `\r\n` -> `\n`
+ * normalize and an `assertNoLeftoverMarker` throw before anything reaches a
+ * model). A `%%GS_` marker here reaches the model unchanged with no error
+ * at all.
+ *
+ * The CRLF half checks for a bare `\r`, not the `\r\n` pair: a lone `\r`
+ * with no trailing `\n` injects the exact same control byte into
+ * model-facing text and is just as real a defect — checking only for the
+ * pair would silently let it through.
+ */
+function scanForLeaks(dir: string, source: string): SkillProblem[] {
+  const problems: SkillProblem[] = [];
+  if (source.includes("%%GS_")) {
+    problems.push({
+      dir,
+      kind: "marker-leak",
+      detail: "a %%GS_ marker in shipped content reaches the model unsubstituted",
+    });
+  }
+  if (source.includes("\r")) {
+    problems.push({
+      dir,
+      kind: "crlf",
+      detail: "a \\r byte (CRLF or a bare CR) would inject into model-facing text",
+    });
+  }
+  return problems;
+}
+
+/**
+ * G1/G2 over a skills root: `<root>/<name>/SKILL.md`, one directory per skill.
  * @param root - a skills root, trailing slash included.
  * @returns one problem per offending file.
  */
@@ -204,16 +235,27 @@ export function checkNoMarkers(root: string): SkillProblem[] {
     } catch {
       continue;
     }
-    if (source.includes("%%GS_")) {
-      problems.push({
-        dir: entry,
-        kind: "marker-leak",
-        detail: "a %%GS_ marker in a command skill reaches the model unsubstituted",
-      });
-    }
-    if (source.includes("\r\n")) {
-      problems.push({ dir: entry, kind: "crlf", detail: "CRLF line endings would inject \\r into model-facing text" });
-    }
+    problems.push(...scanForLeaks(entry, source));
+  }
+  return problems;
+}
+
+/**
+ * G1/G2 over a flat root: loose `<root>/<name>.md` files, one level deep —
+ * the shape `content/roles/` uses. Role briefs are read by delegated
+ * subagents at absolute paths with no normalizing loader in front of them
+ * at all, so this is the only gate standing between a CRLF checkout or a
+ * stray `%%GS_` marker and a child model's context.
+ * @param root - a flat content root, trailing slash included.
+ * @returns one problem per offending file.
+ */
+export function checkNoMarkersFlat(root: string): SkillProblem[] {
+  const problems: SkillProblem[] = [];
+  for (const entry of readdirSync(root)) {
+    if (!entry.endsWith(".md")) continue;
+    const path = `${root}${entry}`;
+    if (statSync(path).isDirectory()) continue;
+    problems.push(...scanForLeaks(entry, readFileSync(path, "utf8")));
   }
   return problems;
 }

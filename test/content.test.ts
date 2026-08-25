@@ -2,11 +2,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { isSkillName } from "@deepseek-ai/dsh-skill";
-import { checkNoMarkers, checkSkillDir, checkSkillRoot, contentDir } from "../src/content.js";
+import { checkNoMarkers, checkNoMarkersFlat, checkSkillDir, checkSkillRoot, contentDir } from "../src/content.js";
 
 const fixtures = fileURLToPath(new URL("./fixtures/skills/", import.meta.url));
 const markerFixtures = fileURLToPath(new URL("./fixtures/marker-skills/", import.meta.url));
 const crlfFixtures = fileURLToPath(new URL("./fixtures/crlf-skills/", import.meta.url));
+const markerRoleFixtures = fileURLToPath(new URL("./fixtures/marker-roles/", import.meta.url));
+const crlfRoleFixtures = fileURLToPath(new URL("./fixtures/crlf-roles/", import.meta.url));
 const read = (dir: string) => readFileSync(`${fixtures}${dir}/SKILL.md`, "utf8");
 
 describe("checkSkillDir", () => {
@@ -143,7 +145,10 @@ describe("contentDir", () => {
 });
 
 describe("G1 command skills must never carry a substitution marker", () => {
-  it("flags a marker in a shipped command skill", () => {
+  // Renamed from "flags a marker in a shipped command skill" — that name
+  // asserted the opposite of what the test checks: this fixture root has
+  // no marker or CRLF in it, so checkNoMarkers must stay quiet over it.
+  it("raises nothing over skill fixtures with no marker or CRLF", () => {
     const problems = checkNoMarkers(`${fixtures}`);
     expect(problems).toEqual([]);
   });
@@ -156,5 +161,38 @@ describe("G1 command skills must never carry a substitution marker", () => {
   it("flags CRLF in a shipped command skill", () => {
     const problems = checkNoMarkers(crlfFixtures);
     expect(problems.map((p) => p.kind)).toContain("crlf");
+  });
+
+  // The check must catch a bare \r, not just the \r\n pair: a lone \r
+  // injects the identical control byte into model-facing text and is the
+  // same class of defect, just rarer on a Windows/autocrlf checkout.
+  it("flags a bare CR with no paired LF, not only a full CRLF pair", () => {
+    const problems = checkNoMarkers(crlfFixtures);
+    const bareCr = problems.filter((p) => p.dir === "gs-bare-cr");
+    expect(bareCr.map((p) => p.kind)).toContain("crlf");
+  });
+});
+
+describe("G1/G2 also cover flat role-brief roots (no SKILL.md nesting)", () => {
+  // content/roles/ holds loose <role>.md files, not <name>/SKILL.md
+  // directories — checkNoMarkers can't walk that shape (it statSync-skips
+  // non-directories), so this is the sibling checkNoMarkersFlat's job.
+  // Role briefs reach a delegated subagent with NO normalizing loader in
+  // front of them at all — not even the CRLF-stripping the orchestration
+  // loader does — so this gate is the only thing standing between a bad
+  // checkout and a child model's context.
+  it("flags a marker in a loose role brief", () => {
+    const problems = checkNoMarkersFlat(markerRoleFixtures);
+    expect(problems.map((p) => p.kind)).toContain("marker-leak");
+  });
+
+  it("flags CRLF in a loose role brief", () => {
+    const problems = checkNoMarkersFlat(crlfRoleFixtures);
+    expect(problems.map((p) => p.kind)).toContain("crlf");
+  });
+
+  it("raises nothing for the real content/roles/ tree", () => {
+    const problems = checkNoMarkersFlat(`${contentDir()}roles/`);
+    expect(problems).toEqual([]);
   });
 });

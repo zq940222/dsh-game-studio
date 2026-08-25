@@ -3,8 +3,17 @@
 *.jpg binary
 *.webp binary
 
-# This fixture's whole reason to exist is a literal CRLF checkout — it
-# proves checkNoMarkers' G2 check fires on real bytes. The blanket
-# `eol=lf` above would silently normalize it away on the next checkin,
-# so it is exempted and stored/checked out byte-for-byte instead.
+# These fixtures' whole reason to exist is a literal CRLF (or bare CR)
+# checkout — they prove checkNoMarkers/checkNoMarkersFlat's G2 check fires
+# on real bytes. The blanket `eol=lf` above would silently normalize them
+# away on the next checkin, so each root is exempted and stored/checked out
+# byte-for-byte instead.
+#
+# ORDER IS LOAD-BEARING: within one .gitattributes file, the LAST matching
+# line wins per attribute, not the most specific pattern. These `-text`
+# lines must stay BELOW the blanket `* text=auto eol=lf` rule above — move
+# one above it and the blanket rule becomes the last match again, silently
+# reinstating `eol=lf` and breaking the fixture it was written to protect.
+# Any future rule added above this comment block re-triggers the same trap.
 test/fixtures/crlf-skills/** -text
+test/fixtures/crlf-roles/** -text
