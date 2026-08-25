@@ -294,10 +294,16 @@ const SKILL_DROP = new Set(["allowed-tools"]);
  * R10/R12: reshape one upstream skill's frontmatter for the harness.
  *
  * `disable-model-invocation: true` is ADDED — upstream has no such key — and
- * upstream's `user-invocable: true` is kept as-is. Everything else the
- * harness has no field for folds into the open `metadata` object rather than
- * being discarded, since the catalog carries only `name` and `description`
- * and metadata therefore costs nothing at model-facing prompt time.
+ * upstream's `user-invocable` value is read and preserved (defaulting to
+ * `true` only when upstream omits the key entirely, which never happens in
+ * the current corpus — every one of the 73 skills sets it explicitly). It is
+ * not hardcoded, because `user-invocable` is also excluded from the
+ * `metadata` fold below: a hardcoded `true` would silently overwrite a
+ * hypothetical upstream `false` with no trace of the original value
+ * anywhere in the output. Everything else the harness has no field for
+ * folds into the open `metadata` object rather than being discarded, since
+ * the catalog carries only `name` and `description` and metadata
+ * therefore costs nothing at model-facing prompt time.
  * `allowed-tools` is the one exception: it is dropped outright, not folded,
  * because it is a list of Claude Code tool names with no harness meaning at
  * all, folded or otherwise.
@@ -326,7 +332,7 @@ export function transformSkillFrontmatter(raw, commandName) {
     name: commandName,
     description: rewriteCommands(String(data.description ?? "")).trim(),
     "disable-model-invocation": true,
-    "user-invocable": true,
+    "user-invocable": data["user-invocable"] ?? true,
   };
   const metaEntries = Object.entries(data).filter(
     ([k]) => !SKILL_TOP_LEVEL.has(k) && !SKILL_DROP.has(k),

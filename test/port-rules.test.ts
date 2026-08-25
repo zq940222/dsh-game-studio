@@ -409,6 +409,19 @@ describe("R10/R12 skill frontmatter", () => {
     const fm = "name: help\ndescription: Show help.\nuser-invocable: true\nmodel: haiku\n";
     expect(transformSkillFrontmatter(fm, "gs-help").routedRole).toBeUndefined();
   });
+
+  it("preserves an upstream user-invocable: false instead of silently overwriting it", () => {
+    // user-invocable is a SKILL_TOP_LEVEL key, so it is also excluded from
+    // the metadata fold below — a hardcoded `true` here would erase a
+    // hypothetical upstream `false` with no trace of it anywhere in the
+    // output. Not reachable in the current corpus (73/73 upstream skills
+    // set it to true explicitly), but the read-and-preserve behavior must
+    // hold regardless of what today's corpus happens to contain.
+    const fm = "name: x\ndescription: d\nuser-invocable: false\nallowed-tools: Read\nmodel: sonnet\n";
+    const { frontmatter } = transformSkillFrontmatter(fm, "gs-x");
+    expect(frontmatter).toContain("user-invocable: false");
+    expect(parseYaml(frontmatter)["user-invocable"]).toBe(false);
+  });
 });
 
 const ROLE_FM = [
@@ -433,6 +446,13 @@ describe("R11 role frontmatter", () => {
     expect(frontmatter).not.toContain("disallowedTools");
     expect(advisory).toContain("Suggested tools");
     expect(advisory).toContain("maxTurns");
+    // Locks in the property that makes bypassing R1/R2 for this quoted list
+    // safe: the tool names must survive byte-for-byte, including the bare
+    // English-word names (Glob, Grep) that rewriteUnconditionalTools would
+    // otherwise lowercase via an unqualified \bGlob\b / \bGrep\b match if the
+    // advisory were ever spliced into the body BEFORE R1 runs over the rest
+    // of it (see transformRoleFrontmatter's CALLER CONTRACT doc comment).
+    expect(advisory).toContain("Read, Glob, Grep, Write, Edit, Bash");
   });
 
   it("assigns tier 1 to a director", () => {
