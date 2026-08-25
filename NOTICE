@@ -6,6 +6,33 @@ This product is a derivative work of Claude-Code-Game-Studios
 Copyright (c) 2026 Donchitos, licensed under the MIT License.
 The upstream license text is reproduced in LICENSE.upstream.
 
+Pinned upstream commit: 984023d. The port (tools/port/port.mjs) reproduces
+content/ from this exact snapshot; re-running it against the same commit
+reproduces content/ byte-identically.
+
+Documents excluded from the port (10): these describe Claude Code's own
+extension points and have no DeepSeek Harness meaning, so rewriting them
+would produce plausible-looking instructions for machinery that does not
+exist here — worse than omitting them. Also recorded in the port manifest.
+  - CLAUDE-local-template.md — template for a personal CLAUDE.local.md
+    override file; a Claude Code config file this harness does not have.
+  - settings-local-template.md — template for a personal
+    .claude/settings.local.json; a Claude Code settings file this harness
+    does not have.
+  - setup-requirements.md — Claude Code install/setup instructions end to
+    end (npm install -g @anthropic-ai/claude-code, hook prerequisites);
+    not applicable to this harness.
+  - hooks-reference.md — overview of the 12 Claude Code PreToolUse/
+    PostToolUse hooks; this harness has no hook-interception seam.
+  - hooks-reference/hook-input-schemas.md — JSON schemas for Claude Code
+    hook stdin payloads; no hook runtime here to receive them.
+  - hooks-reference/post-merge-asset-validation.md — reference doc for one
+    specific upstream hook script; not portable, see hooks-reference.md above.
+  - hooks-reference/post-sprint-retrospective.md — same.
+  - hooks-reference/pre-commit-code-quality.md — same.
+  - hooks-reference/pre-commit-design-check.md — same.
+  - hooks-reference/pre-push-test-gate.md — same.
+
 Summary of changes from the upstream work:
   - Ported from the Claude Code agent/skill/hook/rule extension points to
     the DeepSeek Harness skill registry and subagent seam.
