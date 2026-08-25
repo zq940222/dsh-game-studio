@@ -6,9 +6,11 @@
  * rule quietly mangling prose somewhere inside 2.2 MB of ported text.
  *
  * The tool-name rules are split into three, and the split is empirical, not
- * stylistic. `Read` appears 247 times upstream: 3 backticked, 1 as "Read
- * tool", and 102 as a sentence-initial imperative. A blind word-boundary
- * replace would corrupt the 99% that is English.
+ * stylistic. `Read` appears 437 times in the upstream `.claude` tree: only 3
+ * backticked and 1 as an explicit "Read tool" phrase; the rest is ordinary
+ * prose, 232 of it sentence-initial imperatives ("Read the existing ADR file
+ * completely."). A blind word-boundary replace would corrupt the vast
+ * majority that is English.
  *
  * @module tools/port/rules
  */
@@ -47,11 +49,26 @@ const STRUCTURED = Object.freeze({
   Task: { to: "subagent", positions: ["phrase"] },
 });
 
+/**
+ * Compound phrases R2's per-name positions structurally cannot reach: the
+ * phrase position requires "<Name> tool" with nothing between or after, so
+ * it fails on a "/" separator and on the plural "s". These three strings are
+ * the entire measured population in the upstream corpus — there is no
+ * fourth variant, and the lowercase forms ("edit tools", "write tools")
+ * occur zero times. Enumerated exact literals, not a generalized "tools?"
+ * pattern, so there is no over-match surface beyond these three lines.
+ */
+const COMPOUND_PHRASES = Object.freeze([
+  ["Write/Edit tools", "write/edit tools"],
+  ["Write or Edit tools", "write or edit tools"],
+  ["Task subagent", "subagent"],
+]);
+
 /** R1: rewrite the names that cannot collide with prose. */
 export function rewriteUnconditionalTools(text) {
   let out = text;
   for (const [from, to] of Object.entries(UNCONDITIONAL)) {
-    out = out.replace(new RegExp(`\\b${from}\\b`, "g"), to);
+    out = out.replace(new RegExp("\\b" + from + "\\b", "g"), to);
   }
   return out;
 }
@@ -66,8 +83,13 @@ export function rewriteStructuredTools(text) {
     }
     if (positions.includes("phrase")) {
       // The explicit "<Name> tool" phrase.
-      out = out.replace(new RegExp(`\\b${from} tool\\b`, "g"), `${to} tool`);
+      out = out.replace(new RegExp("\\b" + from + " tool" + "\\b", "g"), `${to} tool`);
     }
+  }
+  // Compound phrases: exact literal substitution, no regex needed — see
+  // COMPOUND_PHRASES for why these three have no over-match surface.
+  for (const [from, to] of COMPOUND_PHRASES) {
+    out = out.split(from).join(to);
   }
   return out;
 }
@@ -77,14 +99,27 @@ export function rewriteStructuredTools(text) {
  *
  * The `standard` agent preset disables `tool-bash` on win32 and ships only
  * `tool-pwsh`, so rewriting `Bash` to `bash` would point the model at a tool
- * that does not exist on Windows. Nine sites is few enough to handle by hand.
+ * that does not exist on Windows.
+ *
+ * Frontmatter tool lists (`tools:`, `allowed-tools:`, `disallowedTools:`)
+ * and `Bash(...)` permission specs are skipped: unfiltered, they made up
+ * roughly 91% of the raw matches (103 lines across 88 files) and drowned
+ * the handful of genuine prose sites a human actually needs to review.
+ * Filtered, the upstream corpus leaves 18 sites across 11 files — 4 of
+ * those are "Git Bash" the shell, not the tool, and stay in the manual
+ * ledger anyway rather than adding a third guess-prone skip condition.
  * @param text - one file's full text.
- * @returns one entry per matching line, 1-indexed.
+ * @returns one entry per matching prose line, 1-indexed.
  */
+const FRONTMATTER_TOOL_KEY = /^\s*(tools|allowed-tools|disallowedTools)\s*:/i;
+
 export function findBashSites(text) {
   const sites = [];
   text.split("\n").forEach((line, i) => {
-    if (/\bBash\b/.test(line)) sites.push({ line: i + 1, text: line });
+    if (!/\bBash\b/.test(line)) return;
+    if (FRONTMATTER_TOOL_KEY.test(line)) return;
+    if (line.includes("Bash(")) return;
+    sites.push({ line: i + 1, text: line });
   });
   return sites;
 }

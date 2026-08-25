@@ -90,6 +90,16 @@ describe("R1 unconditional tool names", () => {
     const prose = "Read the design doc, Write the summary, then Edit it.";
     expect(rewriteUnconditionalTools(prose)).toBe(prose);
   });
+
+  it("does not corrupt real identifiers that merely contain an unconditional tool name as a substring", () => {
+    // Real corpus tokens: Global x17, [GlobalClass] x3, DynamicGlobalIlluminationMethod x1 —
+    // all contain "Glob" as a substring but are not the Glob tool. Without the trailing
+    // word boundary on R1's regex, each would corrupt to e.g. "globalClass".
+    const prose =
+      "Godot's Global autoload and the [GlobalClass] attribute both relate to " +
+      "DynamicGlobalIlluminationMethod, and GrepResults is an unrelated helper class.";
+    expect(rewriteUnconditionalTools(prose)).toBe(prose);
+  });
 });
 
 describe("R2 structured-position tool names", () => {
@@ -98,9 +108,18 @@ describe("R2 structured-position tool names", () => {
     expect(rewriteStructuredTools("`Write` then `Edit`.")).toBe("`write` then `edit`.");
   });
 
-  it("rewrites an explicit 'X tool' phrase, including Task", () => {
+  it("rewrites an explicit 'X tool' phrase for every structured name", () => {
     expect(rewriteStructuredTools("Use the Read tool here.")).toBe("Use the read tool here.");
+    expect(rewriteStructuredTools("Use the Write tool here.")).toBe("Use the write tool here.");
+    expect(rewriteStructuredTools("Use the Edit tool here.")).toBe("Use the edit tool here.");
     expect(rewriteStructuredTools("Delegate via the Task tool.")).toBe("Delegate via the subagent tool.");
+  });
+
+  it("does not match 'tool' as a prefix of a longer word after a structured name", () => {
+    // Without the phrase regex's trailing boundary, "Edit tool" would match the
+    // start of "Edit toolbar" and corrupt it to "edit toolbar".
+    const prose = "Open the Edit toolbar and check the Write toolkit.";
+    expect(rewriteStructuredTools(prose)).toBe(prose);
   });
 
   it("does NOT rewrite a bare-backticked `Task` — it collides with C#/C++/.NET's async Task type", () => {
@@ -128,6 +147,27 @@ describe("R2 structured-position tool names", () => {
   });
 });
 
+describe("R2 enumerated compound phrases", () => {
+  it("rewrites the three enumerated multi-tool phrases", () => {
+    // Real corpus site: agents/lead-programmer.md:50.
+    expect(rewriteStructuredTools("Wait for 'yes' before using Write/Edit tools.")).toBe(
+      "Wait for 'yes' before using write/edit tools.",
+    );
+    expect(rewriteStructuredTools("Confirm before using Write or Edit tools here.")).toBe(
+      "Confirm before using write or edit tools here.",
+    );
+    // Real corpus site: agents/art-director.md:75.
+    expect(
+      rewriteStructuredTools("If running as a Task subagent, structure text so the orchestrator can present it."),
+    ).toBe("If running as a subagent, structure text so the orchestrator can present it.");
+  });
+
+  it("leaves an unrelated lowercase phrase alone", () => {
+    const prose = "The level edit tools panel is under the View menu.";
+    expect(rewriteStructuredTools(prose)).toBe(prose);
+  });
+});
+
 describe("R3 Bash sites are reported, never rewritten", () => {
   it("reports each site with its line number and leaves the text alone", () => {
     const text = "line one\nRun Bash to build.\nnothing here\nUse `Bash` carefully.\n";
@@ -138,5 +178,24 @@ describe("R3 Bash sites are reported, never rewritten", () => {
     ]);
     expect(rewriteUnconditionalTools(text)).toBe(text);
     expect(rewriteStructuredTools(text)).toBe(text);
+  });
+
+  it("does not match Bash as a substring of a longer identifier", () => {
+    const text = "Bashful greetings.\nSuperBash mode enabled.\nBash the code.\n";
+    const sites = findBashSites(text);
+    expect(sites).toEqual([{ line: 3, text: "Bash the code." }]);
+  });
+
+  it("skips Bash mentions inside tool-list frontmatter and Bash(...) permission specs", () => {
+    const text = [
+      "---",
+      "tools: Read, Write, Edit, Bash, Grep",
+      "allowed-tools: Bash(git commit:*), Read",
+      "disallowedTools: Bash",
+      "---",
+      "Run Bash to build the project.",
+    ].join("\n");
+    const sites = findBashSites(text);
+    expect(sites).toEqual([{ line: 6, text: "Run Bash to build the project." }]);
   });
 });
