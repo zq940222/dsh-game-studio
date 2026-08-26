@@ -1,6 +1,11 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { contentDir } from "../src/content.js";
 import { rewritePaths } from "../tools/port/rules.mjs";
-import { checkCounts, checkMarkerLeaks, checkReferentialIntegrity, EXPECTED_COUNTS, renderManifest } from "../tools/port/manifest.mjs";
+import {
+  checkCounts, checkMarkerLeaks, checkReferentialIntegrity, checkSnapshotLineEndings,
+  EXPECTED_COUNTS, renderManifest,
+} from "../tools/port/manifest.mjs";
 
 describe("G3 referential integrity", () => {
   it("passes when every reference resolves", () => {
@@ -187,5 +192,60 @@ describe("rewritePaths guards against an unrecognized destination", () => {
     // an unrecognized dest used to fall through to "../../", which is the
     // WRONG depth for a DOC-class file and nothing would catch it.
     expect(() => rewritePaths("x", "not-a-real-dest")).toThrow();
+  });
+});
+
+describe("templates index", () => {
+  it("is generated with one row per template", () => {
+    const index = readFileSync(`${contentDir()}templates/_index.md`, "utf8");
+    const rows = index.split("\n").filter((l) => l.startsWith("- `"));
+    expect(rows.length).toBe(40);
+    expect(index).not.toContain("_index");
+  });
+
+  it("preserves nested subpaths so the printed paths resolve", () => {
+    // walkMd(templatesSrcDir) yields `rel` values that include subpaths
+    // (collaborative-protocols/...) — the index must print those subpaths
+    // verbatim, not just the bare filename, or a reader following a row
+    // gets a path that does not exist.
+    const index = readFileSync(`${contentDir()}templates/_index.md`, "utf8");
+    expect(index).toContain("`collaborative-protocols/design-agent-protocol.md`");
+  });
+});
+
+describe("checkSnapshotLineEndings", () => {
+  // fixupClaudeDocResidue's FROM/TO blocks are exact-literal `\n`-joined
+  // string matches (port.mjs). A snapshot checked out on Windows with the
+  // common core.autocrlf=true default (no upstream .gitattributes to
+  // override it) silently rewrites every "\n" to "\r\n", which makes every
+  // FROM block miss by one byte — no error, just raw upstream prose
+  // surviving into a ported file. See task-17-report.md's "CRLF" finding
+  // for the byte-level repro this check exists to catch before it happens
+  // again, loudly, instead of shipping wrong output silently.
+  it("passes on LF-only sampled files", () => {
+    expect(checkSnapshotLineEndings([
+      { path: ".claude/docs/quick-start.md", text: "# Quick Start\n\nSome text.\n" },
+    ])).toEqual([]);
+  });
+
+  it("flags a CRLF-containing sampled file and names the fix", () => {
+    const problems = checkSnapshotLineEndings([
+      { path: ".claude/docs/quick-start.md", text: "# Quick Start\r\n\r\nSome text.\r\n" },
+    ]);
+    expect(problems.length).toBe(1);
+    expect(problems[0]).toContain(".claude/docs/quick-start.md");
+    expect(problems[0]).toContain("core.autocrlf=false");
+  });
+
+  it("flags every CRLF-containing file among several sampled, not just the first", () => {
+    const problems = checkSnapshotLineEndings([
+      { path: "a.md", text: "clean\n" },
+      { path: "b.md", text: "dirty\r\n" },
+      { path: "c.md", text: "also dirty\r\n" },
+    ]);
+    expect(problems.length).toBe(2);
+    expect(problems.join(" ")).toContain("b.md");
+    expect(problems.join(" ")).toContain("c.md");
+    expect(problems.join(" ")).not.toContain("a.md: ");
   });
 });

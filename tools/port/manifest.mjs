@@ -24,6 +24,16 @@ import { isCommand, isRole } from "./inventory.mjs";
  * `handbook` is 13, not 12: 12 are ported from the upstream snapshot, and
  * the 13th, `guards.md`, is first-party — sourced from
  * `tools/port/static/`, not the snapshot (see Task 17's `emitStatic`).
+ *
+ * `roles` is 49 and `templates` is 40, each one short of what is actually
+ * on disk: both directories also carry a generated `_index.md` (see
+ * port.mjs's roles loop and, since Task 19, its templates loop) that this
+ * count deliberately excludes. Each count is derived from the SOURCE loop
+ * — `roleNames.length`/`templatesCount`, incremented once per upstream
+ * file — computed BEFORE the index is emitted after that loop, so the
+ * index is never counted. Disk legitimately holds one more file than the
+ * pinned count in both directories; that is the convention, not a missing
+ * file.
  */
 export const EXPECTED_COUNTS = Object.freeze({
   skills: 74, roles: 49, templates: 40, rules: 11,
@@ -44,6 +54,47 @@ export function checkMarkerLeaks(files) {
   const problems = [];
   for (const { path, text } of files) {
     if (text.includes("%%GS_")) problems.push(`${path}: contains a %%GS_ substitution marker`);
+  }
+  return problems;
+}
+
+/**
+ * Pre-flight check on the SNAPSHOT the port reads from, not the content it
+ * writes: does any sampled source file carry CRLF line endings.
+ *
+ * `fixupClaudeDocResidue` (port.mjs) rewrites a handful of files via exact
+ * literal `text.split([FROM]).join([TO])` blocks matched against `\n`-joined
+ * upstream text. A single `\r` byte anywhere in a FROM block's span makes
+ * the whole block silently no-op — not an error, just raw upstream prose
+ * (naming `.claude/`, hooks that no longer exist, etc.) surviving into a
+ * shipped file. A snapshot checked out on Windows with the common
+ * `core.autocrlf=true` default reproduces this on every line, silently,
+ * because the upstream repo carries no `.gitattributes` to override it —
+ * see task-17-report.md's "CRLF" finding for the byte-level repro.
+ *
+ * Sampling a few known files is deliberate, not a shortcut taken under
+ * pressure: `core.autocrlf` is a per-checkout setting, so one CRLF byte
+ * anywhere in a snapshot means every text file in it has the same line
+ * endings — reading the whole tree a second time just to confirm that would
+ * cost real time for no additional signal. The caller (port.mjs) picks the
+ * sample; this function only judges what it's handed.
+ * @param files - `{ path, text }` for each sampled file, as read from the
+ *   snapshot. A missing sample file is the SOURCE_ROOTS guard's concern,
+ *   not this one — omit it rather than passing an empty text.
+ * @returns one problem per CRLF-containing file, each naming the fix.
+ */
+export function checkSnapshotLineEndings(files) {
+  const problems = [];
+  for (const { path, text } of files) {
+    if (text.includes("\r\n")) {
+      problems.push(
+        `${path}: snapshot has CRLF line endings — fixupClaudeDocResidue's literal ` +
+        `FROM/TO blocks match \\n-joined text and silently no-op on \\r\\n input. ` +
+        `Re-extract the snapshot with LF preserved, e.g. ` +
+        `\`git -c core.autocrlf=false archive -o <tar> <sha>\` then \`tar -xf <tar> -C <dest>\`, ` +
+        `or set core.autocrlf=false before checking out the snapshot.`,
+      );
+    }
   }
   return problems;
 }
