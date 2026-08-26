@@ -6,6 +6,7 @@ import {
   appendRoutingLine,
   DEST,
   findBashSites,
+  resolveDepthPrefix,
   rewriteClaudeCodeMentions,
   rewriteClaudeCodeMentionsCounted,
   rewriteClaudeMd,
@@ -411,6 +412,20 @@ describe("R6/R8 paths dispatch on destination", () => {
     expect(rewritePaths("See docs/engine-reference/godot/x.md", DEST.DOC_NESTED)).toBe(
       "See ../../engines/godot/x.md",
     );
+  });
+
+  it("derives the depth from outPath, not the DEST bucket, for a real depth-3 file (engines/unity/modules/input.md)", () => {
+    // This is the case DEPTH_PREFIX[DEST.DOC_NESTED] ("../../", sized for
+    // the 2-level engines/<engine>/x.md shape) gets silently wrong: 31 of
+    // the 46 engine docs sit one level deeper, under modules/ or plugins/.
+    // No test exercised outPath-derived depth at all before this one — the
+    // only outPath values passed anywhere else are depth 1 and depth 2,
+    // both of which the old per-bucket constant also got right. Reverting
+    // resolveDepthPrefix to `DEPTH_PREFIX[dest]` must fail this assertion.
+    expect(resolveDepthPrefix(DEST.DOC_NESTED, "engines/unity/modules/input.md")).toBe("../../../");
+    expect(
+      rewritePaths("See docs/engine-reference/godot/x.md", DEST.DOC_NESTED, "engines/unity/modules/input.md"),
+    ).toBe("See ../../../engines/godot/x.md");
   });
 
   it("NEVER emits a marker for any non-orchestration destination — the provider ships bodies verbatim", () => {

@@ -1124,16 +1124,23 @@ for (const r of roleIndexEntries) {
 emit("roles/_index.md", indexLines.join("\n") + "\n");
 
 // 3. Templates: .claude/docs/templates/**.md -> content/templates/**.md.
-//    Top-level files are DEST.DOC (one level under content/); the nested
-//    collaborative-protocols/ files are DEST.DOC_NESTED (two levels).
+//    Top-level files sit one level under content/; the nested
+//    collaborative-protocols/ files sit two. That distinction used to be
+//    carried as a DEST.DOC vs DEST.DOC_NESTED choice, but every file here
+//    passes its own outPath to rewriteBody, and resolveDepthPrefix derives
+//    the `../` depth from outPath's real nesting whenever outPath is given
+//    (see its doc comment) — the dest bucket is consulted only when outPath
+//    is omitted, which never happens on this call site. So the bucket
+//    passed below has no effect on the emitted text; DEST.DOC is used
+//    because ORCHESTRATION is the only value resolveDepthPrefix treats
+//    specially, and templates are never that.
 const templatesSrcDir = join(snapshot, ".claude/docs/templates");
 let templatesCount = 0;
 for (const { rel, full } of walkMd(templatesSrcDir)) {
   const raw = readFileSync(full, "utf8");
   const outPath = `templates/${rel}`;
   recordBashSites(raw, outPath);
-  const dest = rel.includes("/") ? DEST.DOC_NESTED : DEST.DOC;
-  emit(outPath, rewriteBody(raw, dest, outPath));
+  emit(outPath, rewriteBody(raw, DEST.DOC, outPath));
   templatesCount++;
 }
 
