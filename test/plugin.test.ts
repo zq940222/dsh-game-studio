@@ -90,7 +90,11 @@ describe("orchestration skills", () => {
     apply(ctx, new Config({ engine: "godot", reviewIntensity: "lean" }));
 
     const names = registered.map((s) => s.name).sort();
-    expect(names).toEqual(["gs-guards", "gs-pipeline", "gs-roster", "gs-studio", "gs-templates"]);
+    expect(names).toEqual([
+      "gs-guards", "gs-phase-architecture", "gs-phase-concept", "gs-phase-design",
+      "gs-phase-polish", "gs-phase-qa", "gs-phase-release", "gs-phase-sprint",
+      "gs-pipeline", "gs-roster", "gs-studio", "gs-templates",
+    ]);
     for (const skill of registered) {
       expect(skill.content).not.toContain("%%GS_");
       expect(skill.content).toContain(contentDir());
@@ -105,7 +109,7 @@ describe("orchestration skills", () => {
     expect(existsSync(`${contentDir()}roles/creative-director.md`)).toBe(true);
   });
 
-  it("registers the five non-phase orchestration skills", () => {
+  it("registers all twelve orchestration skills", () => {
     const registered: OrchestrationSkill[] = [];
     const ctx = {
       plugin: () => {},
@@ -113,8 +117,43 @@ describe("orchestration skills", () => {
       logger: { error: () => {}, warn: () => {} },
     } as unknown as Parameters<typeof apply>[0];
     apply(ctx, new Config({}));
-    const names = registered.map((s) => s.name).sort();
-    expect(names).toEqual(["gs-guards", "gs-pipeline", "gs-roster", "gs-studio", "gs-templates"]);
+    expect(registered.map((s) => s.name).sort()).toEqual([
+      "gs-guards", "gs-phase-architecture", "gs-phase-concept", "gs-phase-design",
+      "gs-phase-polish", "gs-phase-qa", "gs-phase-release", "gs-phase-sprint",
+      "gs-pipeline", "gs-roster", "gs-studio", "gs-templates",
+    ]);
+  });
+
+  it("every delegating phase skill carries the background-mode rule", () => {
+    const registered: OrchestrationSkill[] = [];
+    const ctx = {
+      plugin: () => {},
+      skills: { register: (s: OrchestrationSkill) => { registered.push(s); return () => {}; } },
+      logger: { error: () => {}, warn: () => {} },
+    } as unknown as Parameters<typeof apply>[0];
+    apply(ctx, new Config({}));
+    for (const s of registered.filter((s) => s.content.includes("subagent("))) {
+      expect(s.content).toContain("run_in_background: false");
+    }
+  });
+
+  it("resolves every gs-phase-* name in gs-pipeline's table to a registered orchestration skill", () => {
+    const registered: OrchestrationSkill[] = [];
+    const ctx = {
+      plugin: () => {},
+      skills: { register: (s: OrchestrationSkill) => { registered.push(s); return () => {}; } },
+      logger: { error: () => {}, warn: () => {} },
+    } as unknown as Parameters<typeof apply>[0];
+    apply(ctx, new Config({}));
+    const names = new Set(registered.map((s) => s.name));
+    const pipelineText = readFileSync(`${contentDir()}orchestration/gs-pipeline.md`, "utf8");
+    const phaseNames = [...pipelineText.matchAll(/`(gs-phase-[a-z]+)`/g)].map((m) => m[1]!);
+    // Guards the guard: if the table's markup ever changes shape, this must
+    // fail loud rather than silently checking zero names.
+    expect(phaseNames.length).toBeGreaterThan(0);
+    for (const phaseName of phaseNames) {
+      expect(names.has(phaseName), `gs-pipeline.md references ${phaseName}, which is not a registered orchestration skill`).toBe(true);
+    }
   });
 
   it("keeps every orchestration description free of absolute paths", () => {

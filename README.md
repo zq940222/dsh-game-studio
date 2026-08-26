@@ -23,15 +23,16 @@ about it.
 
 This is the full port, not a skeleton. What is installed today:
 
-- `gs-studio` and `gs-roster` — orchestration skills (visible to the model,
-  registered at runtime with this installation's absolute content path
-  substituted in)
+- `gs-studio`, `gs-roster`, `gs-guards`, `gs-templates`, `gs-pipeline`, and
+  the seven `gs-phase-*` phase skills — 12 orchestration skills (visible to
+  the model, registered at runtime with this installation's absolute
+  content path substituted in)
 - 74 command skills reachable from the `/` menu, not visible to the model:
   the 73 studio commands plus `gs-ping`, this phase's own install probe
 - 49 role briefs, one file per role, plus a generated `roles/_index.md`
   roster the port produces
 - 40 document templates, 11 path-scoped coding-standard rule files, 46
-  per-engine reference docs (Godot / Unity / Unreal), and 12 handbook
+  per-engine reference docs (Godot / Unity / Unreal), and 13 handbook
   documents (roster, gates, coordination rules)
 - the 7-phase pipeline guide and catalog under `pipeline/`
 
@@ -115,11 +116,12 @@ exist in this release.
 ## The cost of a shared profile
 
 Installing this into a profile you use for everyday coding is not free.
-The two orchestration skills (`gs-studio`, `gs-roster`) are registered as
-runtime skills and enter the model's skill catalog for **every session** on
-that profile, including ordinary coding sessions that have nothing to do
-with game development. They add to every session's skill listing whether
-you use them or not.
+All 12 orchestration skills — `gs-studio`, `gs-roster`, `gs-guards`,
+`gs-templates`, `gs-pipeline`, and the seven `gs-phase-*` phase skills —
+are registered as runtime skills and enter the model's skill catalog for
+**every session** on that profile, including ordinary coding sessions
+that have nothing to do with game development. They add to every
+session's skill listing whether you use them or not.
 
 The command skills (74 total — the 73 studio commands plus `gs-ping`) do
 not carry this cost — `disable-model-invocation: true` keeps them out of
