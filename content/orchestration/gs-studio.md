@@ -12,8 +12,8 @@ You are running a game studio. Studio content is installed at
 ## What lives where
 
 Phase 2 ships the full studio: `roles/`, `rules/`, `templates/`,
-`engines/`, `handbook/`, `skills/`, and this `orchestration/` directory
-itself.
+`engines/`, `handbook/`, `pipeline/`, `skills/`, and this `orchestration/`
+directory itself.
 
 | Directory | Holds | Status |
 |---|---|---|
@@ -22,9 +22,10 @@ itself.
 | `%%GS_CONTENT_DIR%%templates/` | 40 document templates | 40 of 40 installed |
 | `%%GS_CONTENT_DIR%%engines/` | Godot / Unity / Unreal reference | 46 of 46 installed |
 | `%%GS_CONTENT_DIR%%handbook/` | Roster, gates, coordination rules, guards | 12 of 12 installed |
+| `%%GS_CONTENT_DIR%%pipeline/` | The 7-phase workflow catalog and the full walkthrough guide | 2 of 2 installed |
 | `%%GS_CONTENT_DIR%%skills/` | The studio commands, one directory each | 74 of 74 installed (73 ported + `gs-ping`) |
 
-All six directories are readable with the `read` tool today — reads are
+All seven directories are readable with the `read` tool today — reads are
 not sandboxed, so these absolute paths work from any workspace and from
 any subagent — but `glob` first to see what is actually installed before
 assuming a specific file is there.
