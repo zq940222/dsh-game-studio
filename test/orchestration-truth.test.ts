@@ -106,7 +106,7 @@ describe("orchestration skills tell the truth about what ships", () => {
         // has 7 phases", and "a typical raid party has 4 roles" from
         // ever being examined — none of them assert that something is
         // installed/shipped.
-        if (!/\b(installed|installs|ships|ship|shipped)\b/.test(line)) {
+        if (!/\b(installed|installs|ships|ship|shipped|bundles|includes)\b/i.test(line)) {
           continue;
         }
 

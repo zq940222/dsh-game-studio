@@ -90,7 +90,7 @@ describe("orchestration skills", () => {
     apply(ctx, new Config({ engine: "godot", reviewIntensity: "lean" }));
 
     const names = registered.map((s) => s.name).sort();
-    expect(names).toEqual(["gs-roster", "gs-studio"]);
+    expect(names).toEqual(["gs-guards", "gs-pipeline", "gs-roster", "gs-studio", "gs-templates"]);
     for (const skill of registered) {
       expect(skill.content).not.toContain("%%GS_");
       expect(skill.content).toContain(contentDir());
@@ -103,5 +103,31 @@ describe("orchestration skills", () => {
 
   it("ships the probe role brief the roster points at", () => {
     expect(existsSync(`${contentDir()}roles/creative-director.md`)).toBe(true);
+  });
+
+  it("registers the five non-phase orchestration skills", () => {
+    const registered: OrchestrationSkill[] = [];
+    const ctx = {
+      plugin: () => {},
+      skills: { register: (s: OrchestrationSkill) => { registered.push(s); return () => {}; } },
+      logger: { error: () => {}, warn: () => {} },
+    } as unknown as Parameters<typeof apply>[0];
+    apply(ctx, new Config({}));
+    const names = registered.map((s) => s.name).sort();
+    expect(names).toEqual(["gs-guards", "gs-pipeline", "gs-roster", "gs-studio", "gs-templates"]);
+  });
+
+  it("keeps every orchestration description free of absolute paths", () => {
+    const registered: OrchestrationSkill[] = [];
+    const ctx = {
+      plugin: () => {},
+      skills: { register: (s: OrchestrationSkill) => { registered.push(s); return () => {}; } },
+      logger: { error: () => {}, warn: () => {} },
+    } as unknown as Parameters<typeof apply>[0];
+    apply(ctx, new Config({}));
+    for (const s of registered) {
+      expect(s.description).not.toContain("/");
+      expect(s.description.length).toBeLessThan(320);
+    }
   });
 });
