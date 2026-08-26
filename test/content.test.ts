@@ -12,6 +12,7 @@ const crlfRoleFixtures = fileURLToPath(new URL("./fixtures/crlf-roles/", import.
 const treeGoodFixtures = fileURLToPath(new URL("./fixtures/tree-good/", import.meta.url));
 const treeMarkerFixtures = fileURLToPath(new URL("./fixtures/tree-marker/", import.meta.url));
 const treeCrlfFixtures = fileURLToPath(new URL("./fixtures/tree-crlf/", import.meta.url));
+const projectMarkerFixtures = fileURLToPath(new URL("./fixtures/project-marker/", import.meta.url));
 const read = (dir: string) => readFileSync(`${fixtures}${dir}/SKILL.md`, "utf8");
 
 describe("checkSkillDir", () => {
@@ -258,6 +259,74 @@ describe("G1/G2 cover every content/ directory except orchestration/, at any nes
   it("would wrongly flag the real orchestration/ tree if it were ever scanned this way", () => {
     const problems = checkNoMarkersTree(`${contentDir()}orchestration/`);
     expect(problems.map((p) => p.kind)).toContain("marker-leak");
+  });
+});
+
+describe("project templates use {{…}}, never %%GS_", () => {
+  // content/project/ is NOT part of the port (see global-constraints.md):
+  // it is hand-written, ships verbatim to a user's workspace, and nothing
+  // substitutes its `{{...}}` placeholders — that happens later, at
+  // /gs-start scaffold time, by the model filling them in from the
+  // resource base it was given. `%%GS_` is the OTHER placeholder
+  // convention, reserved for runtime-registered orchestration skills that
+  // DO get substituted by loadOrchestrationSkill — a `%%GS_` marker
+  // landing in project/ would never be substituted and would leak
+  // unchanged into a user's workspace, so it must still fail G1/G2 here
+  // exactly like every other content/ directory (lint-content.mjs's
+  // exception-shaped loop already sweeps project/ in automatically; it
+  // excludes only skills/ and orchestration/ by name).
+  it("accepts a template with {{CONTENT_DIR}}", () => {
+    expect(checkNoMarkersTree(`${contentDir()}project/`)).toEqual([]);
+  });
+
+  it("rejects %%GS_ in a project template", () => {
+    const problems = checkNoMarkersTree(projectMarkerFixtures);
+    expect(problems.map((p) => p.kind)).toContain("marker-leak");
+  });
+
+  // G3 (checkReferentialIntegrity in tools/port/manifest.mjs) cannot see
+  // through `{{CONTENT_DIR}}`: its RELATIVE_REF_RE requires a literal
+  // `../` prefix, so a `{{CONTENT_DIR}}rules/typo-code.md` path is
+  // invisible to it — G3 only ever runs over ported content anyway, and
+  // project/ is explicitly not part of the port. Nothing else validates
+  // that these paths point at real files, yet AGENTS.md.template is
+  // copied verbatim into a user's workspace, so a misspelled rule
+  // filename would ship as a silently broken instruction. This test is
+  // the gate that catches that, specific to content/project/.
+  it("every {{CONTENT_DIR}} path in project/ resolves to a real file", () => {
+    const problems: string[] = [];
+    const root = `${contentDir()}project/`;
+    for (const file of readdirSync(root)) {
+      const text = readFileSync(`${root}${file}`, "utf8");
+      for (const m of text.matchAll(/\{\{CONTENT_DIR\}\}([A-Za-z0-9_\-./]+)/g)) {
+        const rel = m[1]!;
+        if (!existsSync(`${contentDir()}${rel}`)) {
+          problems.push(`${file}: {{CONTENT_DIR}}${rel} does not exist`);
+        }
+      }
+    }
+    expect(problems).toEqual([]);
+  });
+});
+
+describe("clearOwned() in tools/port/port.mjs must never touch content/project/", () => {
+  // project/ is hand-written, not port output (global-constraints.md).
+  // clearOwned() rmSyncs six directories plus skills/gs-* before every
+  // port run; if "project" ever entered that list, the next port would
+  // silently delete this hand-written content. This reads port.mjs's
+  // actual source and extracts the real array clearOwned() iterates,
+  // rather than asserting a hand-copied duplicate of it — a copy could
+  // drift from the real list and stay green while the real one changed.
+  it('does not include "project" in the real clearOwned() directory list', () => {
+    const portSource = readFileSync(
+      fileURLToPath(new URL("../tools/port/port.mjs", import.meta.url)),
+      "utf8",
+    );
+    const m = /function clearOwned\(\)\s*\{[\s\S]*?for \(const dir of \[([^\]]+)\]\)/.exec(portSource);
+    expect(m, "could not find clearOwned()'s directory list in port.mjs").not.toBeNull();
+    const dirs = m![1]!.split(",").map((s) => s.trim().replace(/^"(.*)"$/, "$1"));
+    expect(dirs).toEqual(["roles", "templates", "rules", "engines", "handbook", "pipeline"]);
+    expect(dirs).not.toContain("project");
   });
 });
 

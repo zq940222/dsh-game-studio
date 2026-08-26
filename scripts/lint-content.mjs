@@ -23,10 +23,16 @@ const skillsRoot = `${contentRoot}skills/`;
 // The rule is expressed as an exception ("every directory except
 // orchestration/"), not as an enumerated allowlist of directories to
 // check: an allowlist goes stale the moment a new directory lands under
-// content/ — as Task 14 is about to do three times over (handbook/,
-// templates/, engines/, pipeline/). "skills" is excluded from THIS loop
-// only to avoid double-reporting what the dedicated call above already
-// covers — it is not exempt from G1/G2 itself.
+// content/ — as Task 14 did three times over (handbook/, templates/,
+// engines/, pipeline/) and Task 22 did again for project/. project/ is
+// NOT part of the port (global-constraints.md) and uses `{{...}}`
+// placeholders rather than `%%GS_`, but that needed no special case
+// here: checkNoMarkersTree only ever flags `%%GS_` and `\r`, so it
+// already accepts `{{...}}` and already rejects a stray `%%GS_` (which
+// nothing would ever substitute inside project/) exactly like every
+// other swept-in directory. "skills" is excluded from THIS loop only to
+// avoid double-reporting what the dedicated call above already covers —
+// it is not exempt from G1/G2 itself.
 const problems = [...checkSkillRoot(skillsRoot), ...checkNoMarkers(skillsRoot)];
 for (const entry of readdirSync(contentRoot)) {
   if (entry === "skills" || entry === "orchestration") continue;

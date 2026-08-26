@@ -1,0 +1,49 @@
+# {{PROJECT_NAME}} — studio configuration
+
+This file is read into every session in this workspace. It is the
+project's own copy; edit it freely.
+
+## Engine
+
+{{ENGINE}}
+
+## Where the studio lives
+
+The studio's roles, rules, templates, engine references, handbook, and
+pipeline are installed with the plugin at:
+
+{{CONTENT_DIR}}
+
+Reads are not sandboxed, so those absolute paths work from any subagent.
+
+## Path-scoped rules
+
+Match the file you are editing to the rule that governs it. Read the rule
+before editing, not after:
+
+| When editing | Read |
+|---|---|
+| gameplay systems | `{{CONTENT_DIR}}rules/gameplay-code.md` |
+| engine-layer code | `{{CONTENT_DIR}}rules/engine-code.md` |
+| AI / behaviour | `{{CONTENT_DIR}}rules/ai-code.md` |
+| networking | `{{CONTENT_DIR}}rules/network-code.md` |
+| shaders | `{{CONTENT_DIR}}rules/shader-code.md` |
+| UI | `{{CONTENT_DIR}}rules/ui-code.md` |
+| prototypes | `{{CONTENT_DIR}}rules/prototype-code.md` |
+| tests | `{{CONTENT_DIR}}rules/test-standards.md` |
+| design documents | `{{CONTENT_DIR}}rules/design-docs.md` |
+| narrative | `{{CONTENT_DIR}}rules/narrative.md` |
+| data files | `{{CONTENT_DIR}}rules/data-files.md` |
+
+This harness does not load these automatically — there is no path-scoped
+rule mechanism. The table is the mechanism.
+
+## How this studio works
+
+Load `gs-studio` for the operating system, `gs-roster` before delegating,
+`gs-pipeline` to find the current phase, and `gs-guards` before committing.
+
+## Collaborative, not autonomous
+
+Present options and trade-offs; the user decides. Do not start
+implementation on an unapproved design.

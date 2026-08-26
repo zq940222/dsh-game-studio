@@ -258,12 +258,24 @@ export function checkNoMarkers(root: string): SkillProblem[] {
  * Every one of those directories is model-facing text read verbatim at
  * an absolute path, with no normalizing loader in front of it — the same
  * three facts that justified `content/roles/` coverage apply unchanged
- * to `content/handbook/`, `content/templates/`, `content/pipeline/`, and
- * `content/engines/`. The shapes already differ (`roles/` is flat,
- * `engines/<engine>/**` nests one level deeper, and future directories
- * may nest differently still), so this walks recursively rather than
- * assuming any fixed depth — a flat root is simply a tree with no
- * subdirectories to recurse into, so this one function covers both.
+ * to `content/handbook/`, `content/templates/`, `content/pipeline/`,
+ * `content/engines/`, and `content/project/`. The shapes already differ
+ * (`roles/` is flat, `engines/<engine>/**` nests one level deeper, and
+ * future directories may nest differently still), so this walks
+ * recursively rather than assuming any fixed depth — a flat root is
+ * simply a tree with no subdirectories to recurse into, so this one
+ * function covers both.
+ *
+ * `content/project/` is the one directory here that is NOT part of the
+ * port (global-constraints.md) and uses a different placeholder
+ * convention on purpose: `{{...}}`, filled in later by the model at
+ * `/gs-start` scaffold time, never `%%GS_`, which is reserved for
+ * runtime-registered orchestration skills. Nothing exempts `{{...}}`
+ * from this scan because nothing needs to — it only ever flags `%%GS_`
+ * and `\r`, so a `{{CONTENT_DIR}}` placeholder already passes untouched,
+ * and a stray `%%GS_` here (which nothing would ever substitute) still
+ * correctly fails as a leak, same as everywhere else this function
+ * covers.
  * @param root - a content root, trailing slash included.
  * @returns one problem per offending file. `dir` is the path relative to
  *   `root` (forward-slash-joined), so a nested file stays identifiable —

@@ -22,6 +22,7 @@ import { EXPECTED_COUNTS } from "../tools/port/manifest.mjs";
 
 const packageJsonPath = fileURLToPath(new URL("../package.json", import.meta.url));
 const readmePath = fileURLToPath(new URL("../README.md", import.meta.url));
+const readmeZhPath = fileURLToPath(new URL("../README.zh.md", import.meta.url));
 
 describe("package.json description tells the truth about what ships", () => {
   const pkg = JSON.parse(readFileSync(packageJsonPath, "utf8")) as { description: string };
@@ -114,6 +115,61 @@ describe("README.md's count claims tell the truth about what ships", () => {
     const orchCount = readdirSync(`${contentDir()}orchestration/`).filter((f) => f.endsWith(".md")).length;
     const matches = [...readme.matchAll(/(\d+)\s+orchestration skills\b/g)];
     expect(matches.length, 'README.md does not mention "orchestration skills"').toBeGreaterThan(0);
+    for (const m of matches) {
+      expect(Number(m[1])).toBe(orchCount);
+    }
+  });
+});
+
+// README.zh.md is the fourth surface carrying these installed-count
+// claims in prose, and the one Task 21 explicitly left out of scope when
+// it fixed package.json's description and README.md above. It went on
+// carrying three stale numbers: "gs-studio 与 gs-roster" as if those were
+// the only two orchestration skills (there are 12), "12 份手册文档" (Task
+// 17 made it 13, same miss README.md had), and "两条编排技能" in the
+// "共享 profile 的代价" section — the paragraph making this package's
+// central design claim (every orchestration skill's description sits in
+// every session's model catalog permanently, whether the session needs
+// game-dev content or not). Same fix, same shape as README.md: read the
+// file back and check every count claim against EXPECTED_COUNTS / the
+// live orchestration directory count, using the Chinese noun phrases as
+// README.zh.md actually phrases them (deliberately not reused from either
+// nounToKey map above — the three documents phrase the same counts three
+// different ways).
+describe("README.zh.md's count claims tell the truth about what ships", () => {
+  const readmeZh = readFileSync(readmeZhPath, "utf8");
+
+  it("has a README.zh.md to check", () => {
+    expect(readmeZh.length).toBeGreaterThan(0);
+  });
+
+  const readmeZhNounToKey: Record<string, keyof typeof EXPECTED_COUNTS> = {
+    "条命令技能": "skills",
+    "份角色简报": "roles",
+    "个文档模板": "templates",
+    "份按路径生效的编码规范规则文件": "rules",
+    "份按引擎划分的": "engines",
+    "份手册文档": "handbook",
+  };
+
+  for (const [noun, key] of Object.entries(readmeZhNounToKey)) {
+    it(`claims the pinned ${key} count for "${noun}"`, () => {
+      const m = new RegExp(`(\\d+)\\s*${noun}`).exec(readmeZh);
+      expect(m, `README.zh.md does not mention "${noun}"`).not.toBeNull();
+      expect(Number(m![1])).toBe(EXPECTED_COUNTS[key]);
+    });
+  }
+
+  it('claims the live count of content/orchestration/*.md for every "N 个编排技能" mention', () => {
+    // README.zh.md makes this claim twice, same as README.md: the
+    // "当前状态" bullet list and the "共享 profile 的代价" section.
+    // Checking only the first match would leave the second free to drift
+    // independently — exactly what happened here (the first was fixed
+    // implicitly by naming only two skills with no count at all, while
+    // the second explicitly said "两条编排技能").
+    const orchCount = readdirSync(`${contentDir()}orchestration/`).filter((f) => f.endsWith(".md")).length;
+    const matches = [...readmeZh.matchAll(/(\d+)\s*个编排技能/g)];
+    expect(matches.length, 'README.zh.md does not mention "N 个编排技能"').toBeGreaterThan(0);
     for (const m of matches) {
       expect(Number(m[1])).toBe(orchCount);
     }
