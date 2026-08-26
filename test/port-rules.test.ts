@@ -1,6 +1,8 @@
-import { posix } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { posix, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parse as parseYaml } from "yaml";
+import { contentDir } from "../src/content.js";
 import { COMMANDS, EXCLUDED_DOCS, ROLES, UPSTREAM_SHA, isCommand, isRole } from "../tools/port/inventory.mjs";
 import {
   appendRoutingLine,
@@ -816,5 +818,25 @@ describe("*Counted rule variants report sites, not files", () => {
     const { text, count } = rewriteClaudeCodeMentionsCounted(s);
     expect(text).toBe(rewriteClaudeCodeMentions(s));
     expect(count).toBe(1);
+  });
+});
+
+describe("gs-start scaffold append", () => {
+  it("appends the scaffold section to gs-start only", () => {
+    const start = readFileSync(`${contentDir()}skills/gs-start/SKILL.md`, "utf8");
+    expect(start).toContain("## Scaffolding this project for the harness");
+    expect(start).toContain("AGENTS.md");
+    const help = readFileSync(`${contentDir()}skills/gs-help/SKILL.md`, "utf8");
+    expect(help).not.toContain("## Scaffolding this project for the harness");
+  });
+
+  it("the scaffold's relative paths resolve from gs-start's own directory", () => {
+    const base = `${contentDir()}skills/gs-start/`;
+    const start = readFileSync(`${base}SKILL.md`, "utf8");
+    const problems: string[] = [];
+    for (const m of start.matchAll(/`(\.\.\/[A-Za-z0-9_\-./]+\.md)`/g)) {
+      if (!existsSync(resolve(base, m[1]!))) problems.push(`unresolvable: ${m[1]}`);
+    }
+    expect(problems).toEqual([]);
   });
 });

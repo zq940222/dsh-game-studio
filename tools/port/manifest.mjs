@@ -119,9 +119,26 @@ const RELATIVE_REF_RE = /(\]\(|`)(\.\.\/[\w./-]+\.md)(\)|`)/g;
  * this template never existed upstream. The skill reaches it via "glob for
  * X and Y … if not found, use the built-in templates instead", so a miss
  * degrades gracefully rather than failing — see SKILL.md's Phase 2b.
+ *
+ * `skills/gs-start/SKILL.md` -> `project/directory-scaffold.md`: unlike the
+ * entry above, this target is not missing — `content/project/` is real,
+ * shipped, first-party content (Task 22's `directory-scaffold.md` and
+ * `AGENTS.md.template`). It is simply not part of the port's OWN output:
+ * `content/project/` is explicitly excluded from `clearOwned()` and never
+ * populated by `emit()` (see the global constraint that `content/project/`
+ * "不属于 port"), so it never enters `written` and `knownPaths` here can
+ * never contain it, no matter how real the file is on disk. G3 is a check
+ * against the port's ledger, not the filesystem, so this reference is
+ * structurally invisible to it — the actual resolvability of both
+ * `project/` references gs-start's scaffold section adds (this one, and
+ * `project/AGENTS.md.template`, which RELATIVE_REF_RE never even matches
+ * since it doesn't end in `.md`) is instead proven by
+ * "the scaffold's relative paths resolve from gs-start's own directory" in
+ * test/port-rules.test.ts, which resolves both against real disk state.
  */
 const REFERENTIAL_INTEGRITY_ALLOWLIST = new Set([
   "skills/gs-patch-notes/SKILL.md -> templates/patch-notes-template.md",
+  "skills/gs-start/SKILL.md -> project/directory-scaffold.md",
 ]);
 
 /**

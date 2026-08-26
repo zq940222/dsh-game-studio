@@ -1129,6 +1129,28 @@ for (const name of skillNames) {
   recordBashSites(raw, outPath, fmLineCount(frontmatter) - fmLineCount(rawFm));
   let body = rewriteBody(rawBody, DEST.SKILL, outPath);
   if (routedRole) { body = appendRoutingLine(body, routedRole); ruleHits.R13++; } // R13: routing line, only where routedRole exists
+  // gs-start only: upstream's onboarding assumes the studio lives IN the
+  // project; on this harness it ships with the plugin, so gs-start needs an
+  // extra section that scaffolds the project's own AGENTS.md and directory
+  // tree instead. This is an APPEND, not a fixupClaudeDocResidue literal
+  // FROM/TO block, and deliberately so: a literal block silently no-ops the
+  // moment the upstream text it matches drifts — this phase has already
+  // been bitten by that twice (it is why the CRLF guard above exists) — and
+  // there is no upstream text to match here anyway, since this section has
+  // no upstream analog at all. An append cannot silently fail to apply:
+  // either the section lands in the shipped file or the
+  // "gs-start scaffold append" test in port-rules.test.ts goes red.
+  // Guarded on the OUTPUT command name (`gs-${name}`, not the bare upstream
+  // `name`) so only gs-start gets it — see that same test's "gs-help does
+  // NOT get the section" assertion, the regression guard for a mis-scoped
+  // append. Sourced from tools/port/static/ via the STATIC_DIR constant
+  // Task 17 established (see emitStatic's doc comment): the scaffold text
+  // is a partial, not a whole file, so emitStatic itself is not called here,
+  // but reusing STATIC_DIR keeps this from declaring a second path to the
+  // same directory.
+  if (`gs-${name}` === "gs-start") {
+    body += readFileSync(join(STATIC_DIR, "gs-start-scaffold.md"), "utf8");
+  }
   // No extra "\n" here: splitFm preserves the original blank line (if any)
   // as body's own leading newline, so inserting one more would double it.
   emit(outPath, `---\n${frontmatter}---\n${body}`);
