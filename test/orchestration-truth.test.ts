@@ -34,82 +34,94 @@ describe("orchestration skills tell the truth about what ships", () => {
       "coding standards": "rules",
     };
 
+    // List of actual shipped directories (NOT including "excluded")
+    const shippedDirs = ["roles", "templates", "rules", "engines", "handbook", "pipeline", "skills"];
+
     for (const file of files) {
       const text = readFileSync(`${orchDir}${file}`, "utf8");
-      const matchedDirs = new Set<string>();
+      const lines = text.split("\n");
 
-      // Match table format: %%GS_CONTENT_DIR%%<dir> ... N of N installed
-      for (const m of text.matchAll(
-        /%%GS_CONTENT_DIR%%([a-z]+)[^\n]*?(\d+) of (\d+) installed/g,
-      )) {
-        const [, dir, have, total] = m;
-        matchedDirs.add(dir);
-        const expected = EXPECTED_COUNTS[dir as keyof typeof EXPECTED_COUNTS];
-        if (expected === undefined) {
-          problems.push(`${file}: claims a count for ${dir}/, which EXPECTED_COUNTS does not pin`);
-        } else if (Number(have) !== expected || Number(total) !== expected) {
-          problems.push(`${file}: claims ${have} of ${total} for ${dir}/, pinned count is ${expected}`);
+      for (let lineNum = 0; lineNum < lines.length; lineNum++) {
+        const line = lines[lineNum];
+
+        // Match table format: %%GS_CONTENT_DIR%%<dir> ... N of N installed
+        for (const m of line.matchAll(
+          /%%GS_CONTENT_DIR%%([a-z]+)[^\n]*?(\d+) of (\d+) installed/g,
+        )) {
+          const [, dir, have, total] = m;
+          const expected = EXPECTED_COUNTS[dir as keyof typeof EXPECTED_COUNTS];
+          if (expected === undefined) {
+            problems.push(`${file}:${lineNum + 1}: claims a count for ${dir}/, which EXPECTED_COUNTS does not pin`);
+          } else if (Number(have) !== expected || Number(total) !== expected) {
+            problems.push(`${file}:${lineNum + 1}: claims ${have} of ${total} for ${dir}/, pinned count is ${expected}`);
+          }
         }
-      }
 
-      // Match prose form: "All N role briefs are installed" etc
-      // Build regex with known noun patterns (longest first to avoid partial matches)
-      const sortedNouns = Object.keys(nounToDir).sort((a, b) => b.length - a.length);
-      const nounPattern = sortedNouns.map((n) => n.replace(/\s/g, "\\s+")).join("|");
-      const proseRegex = new RegExp(`(\\d+)\\s+(${nounPattern})(?:\\s+(?:are|is)\\s+installed|[\\.,\\n]|$)`, "gi");
+        // Only process prose claims on installation-asserting lines
+        // (Requirement 1: Consider only installation-asserting lines)
+        if (!/\b(installed|installs|ships|ship|shipped)\b/.test(line)) {
+          continue;
+        }
 
-      for (const m of text.matchAll(proseRegex)) {
-        const num = Number(m[1]);
-        const phrase = m[2].toLowerCase().replace(/\s+/g, " ");
+        // Track what was validated on this line
+        const validatedClaims = new Set<string>();
 
-        // Find matching noun
+        // Match prose with explicitly listed noun patterns (Requirement 2)
+        const sortedNouns = Object.keys(nounToDir).sort((a, b) => b.length - a.length);
+
         for (const noun of sortedNouns) {
-          if (phrase === noun) {
+          // Build a regex specifically for this noun, avoiding the lazy-match issue
+          const nounRegex = new RegExp(`(\\d+)\\s+${noun.replace(/\s/g, "\\s+")}`, "gi");
+
+          for (const m of line.matchAll(nounRegex)) {
+            const num = Number(m[1]);
             const dir = nounToDir[noun];
-            matchedDirs.add(dir);
-            const expected = EXPECTED_COUNTS[dir as keyof typeof EXPECTED_COUNTS];
+            const claimKey = `${num}-${noun}`;
+
+            validatedClaims.add(claimKey);
+
+            const expected = EXPECTED_COUNTS[dir];
             if (expected !== undefined && num !== expected) {
-              problems.push(`${file}: claims ${num} ${noun}, pinned count for ${dir}/ is ${expected}`);
+              problems.push(`${file}:${lineNum + 1}: claims ${num} ${noun}, pinned count for ${dir}/ is ${expected}`);
             }
-            break;
-          }
-        }
-      }
-
-      // Tripwire: detect unchecked count claims
-      // If file contains number + noun/directory that we should catch but didn't, fail
-      const allCountPatterns = [...Object.keys(nounToDir), ...Object.keys(EXPECTED_COUNTS)];
-
-      for (const m of text.matchAll(/(\d+)\s+([a-z\s-]+?)(?:\s|,|\.|\n|$)/g)) {
-        const phrase = m[2].toLowerCase().trim();
-
-        // Check if this phrase is a count-bearing word we should have matched
-        let shouldMatch = false;
-        for (const pattern of allCountPatterns) {
-          if (phrase === pattern || phrase.endsWith(` ${pattern}`)) {
-            shouldMatch = true;
-            break;
           }
         }
 
-        if (shouldMatch) {
-          // Find which directory this should match
-          let dir: string | undefined;
-          for (const noun of Object.keys(nounToDir)) {
-            if (phrase === noun || phrase.endsWith(` ${noun}`)) {
-              dir = nounToDir[noun];
-              break;
+        // Tripwire: on installation lines, check for unmatched count claims (Requirement 2/4)
+        // Look for any <number> <noun-or-dir> that appears on this line but wasn't validated
+        for (const noun of sortedNouns) {
+          const nounRegex = new RegExp(`(\\d+)\\s+${noun.replace(/\s/g, "\\s+")}`, "gi");
+
+          for (const m of line.matchAll(nounRegex)) {
+            const num = m[1];
+            const claimKey = `${num}-${noun}`;
+
+            if (!validatedClaims.has(claimKey)) {
+              problems.push(`${file}:${lineNum + 1}: unchecked installation claim "${num} ${noun}"`);
             }
           }
-          if (!dir) {
-            dir = allCountPatterns.find((p) => phrase === p || phrase.endsWith(` ${p}`));
-          }
+        }
 
-          // If we should match but didn't, this is unchecked prose
-          if (dir && !matchedDirs.has(dir)) {
-            problems.push(
-              `${file}: contains count claim "${m[1]} ${phrase}" for ${dir}/ that test does not validate`,
-            );
+        // Also check for shipped directory names with numbers
+        for (const dir of shippedDirs) {
+          const dirRegex = new RegExp(`(\\d+)\\s+${dir}\\b`, "gi");
+
+          for (const m of line.matchAll(dirRegex)) {
+            const num = m[1];
+            const claimKey = `${num}-${dir}`;
+
+            // Check if this was validated by a noun mapping to this directory
+            let found = false;
+            for (const noun of sortedNouns) {
+              if (nounToDir[noun] === dir && validatedClaims.has(`${num}-${noun}`)) {
+                found = true;
+                break;
+              }
+            }
+
+            if (!found && !validatedClaims.has(claimKey)) {
+              problems.push(`${file}:${lineNum + 1}: unchecked installation claim "${num} ${dir}"`);
+            }
           }
         }
       }
