@@ -75,10 +75,17 @@ if (missingRoots.length > 0) {
 // "\r\n", which makes fixupClaudeDocResidue's exact-literal FROM/TO blocks
 // miss by one byte per line and silently no-op — no error, just raw
 // upstream prose shipped in a handful of files (see task-17-report.md's
-// "CRLF" finding for the byte-level repro, and checkSnapshotLineEndings'
-// doc comment for why sampling these specific files is enough). Sampled
-// files are exactly the ones fixupClaudeDocResidue rewrites, so a hit here
-// means that mechanism would have silently failed.
+// "CRLF" finding for the byte-level repro).
+//
+// The four files sampled below are a CHECKOUT-WIDE PROXY, not an
+// exhaustive list of what fixupClaudeDocResidue rewrites — that function
+// actually has 23 outName branches (five handbook docs with real content
+// edits, plus roughly fourteen gs-* command skills), and only these four
+// are sampled. That is fine, not a gap: core.autocrlf is a per-checkout
+// setting (see checkSnapshotLineEndings' doc comment), so CRLF in one file
+// of a checkout means CRLF throughout it — any sample is an equally valid
+// proxy for the whole tree. The guard's soundness rests on that argument,
+// not on these four files being the only ones at risk.
 const CRLF_SAMPLE_FILES = [
   ".claude/docs/quick-start.md",
   ".claude/docs/directory-structure.md",
