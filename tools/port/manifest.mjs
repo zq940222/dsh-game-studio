@@ -20,10 +20,14 @@ import { isCommand, isRole } from "./inventory.mjs";
  * aggregate here is deliberate — the split that keeps a short port visible
  * behind it (rather than masked by an unrelated extra summing back to 74)
  * lives in the rendered manifest, not in this gate; see {@link renderManifest}.
+ *
+ * `handbook` is 13, not 12: 12 are ported from the upstream snapshot, and
+ * the 13th, `guards.md`, is first-party — sourced from
+ * `tools/port/static/`, not the snapshot (see Task 17's `emitStatic`).
  */
 export const EXPECTED_COUNTS = Object.freeze({
   skills: 74, roles: 49, templates: 40, rules: 11,
-  engines: 46, handbook: 12, pipeline: 2, excluded: 10,
+  engines: 46, handbook: 13, pipeline: 2, excluded: 10,
 });
 
 /**

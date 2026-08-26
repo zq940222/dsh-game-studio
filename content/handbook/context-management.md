@@ -101,7 +101,7 @@ conversation history is secondary.
 
 If a session dies ("prompt too long") or you start a new session to continue work:
 
-1. There is no session-start hook here to do this automatically (see `NOTICE`) — check `production/session-state/active.md` yourself
+1. There is no session-start hook here to do this automatically (see `guards.md`) — check `production/session-state/active.md` yourself
 2. Read the full state file for context
 3. Read the partially-completed file(s) listed in the state
 4. Continue from the next incomplete section or task

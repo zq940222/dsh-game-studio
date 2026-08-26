@@ -9,7 +9,7 @@ Upstream: `984023d`
 - templates: 40
 - rules: 11
 - engines: 46
-- handbook: 12
+- handbook: 13
 - pipeline: 2
 - excluded: 10
 - skills breakdown: 73 ported + 1 first-party

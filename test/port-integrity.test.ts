@@ -124,7 +124,7 @@ describe("G4 counts", () => {
   it("carries the pinned-snapshot counts, aggregating first-party skills into the 73 ported", () => {
     expect(EXPECTED_COUNTS).toEqual({
       skills: 74, roles: 49, templates: 40, rules: 11,
-      engines: 46, handbook: 12, pipeline: 2, excluded: 10,
+      engines: 46, handbook: 13, pipeline: 2, excluded: 10,
     });
   });
 

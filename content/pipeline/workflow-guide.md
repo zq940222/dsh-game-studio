@@ -4,8 +4,8 @@
 >
 > This guide walks you through every phase of game development using the
 > 49-agent system, 73 slash commands, and a set of coordination checklists
-> (see `NOTICE` for what upstream's 12 automated hooks became on this
-> harness). It assumes you are working from the project root.
+> (see `../handbook/guards.md` for what upstream's 12 automated hooks
+> became on this harness). It assumes you are working from the project root.
 >
 > The pipeline has 7 phases. Each phase has a formal gate (`/gs-gate-check`)
 > that must pass before you advance. The authoritative phase sequence is
@@ -65,10 +65,10 @@ This guided onboarding asks where you are and routes you to the right phase:
 ### Step 3: Understand the Guardrails
 
 This harness has no pre-tool-use interception, so the upstream project's
-validation hooks are not wired as executable gates here — see `NOTICE`
-for the full mapping. What ships instead are checklists, approval
-prompts, and reminders threaded through the command skills; nothing
-here will stop a bad commit automatically.
+validation hooks are not wired as executable gates here — see
+`../handbook/guards.md` for the full mapping. What ships instead are
+checklists, approval prompts, and reminders threaded through the
+command skills; nothing here will stop a bad commit automatically.
 
 ### Step 4: Ask for Help Anytime
 
@@ -1106,8 +1106,8 @@ Coordinates release-manager, QA, and DevOps through:
 
 ### Step 7.5: Ship
 
-There is no automatic push guard here (see `NOTICE`) — treat pushes to
-`main` or `develop` as deliberate, considered actions:
+There is no automatic push guard here (see `../handbook/guards.md`) —
+treat pushes to `main` or `develop` as deliberate, considered actions:
 
 ```bash
 git tag v1.0.0
@@ -1234,9 +1234,9 @@ Tier 3 (Specialists):  gameplay-programmer, engine-programmer,
 Upstream ran this as 12 automated shell hooks (session start/stop,
 pre/post compaction, commit and push validation, agent-start logging,
 and more). This harness has no pre-tool-use interception to wire them
-into — see `NOTICE` for the full mapping. Equivalent coverage, where
-it exists at all, comes from checklists and reminders in the command
-skills themselves; none of it can block an action.
+into — see `../handbook/guards.md` for the full mapping. Equivalent
+coverage, where it exists at all, comes from checklists and reminders
+in the command skills themselves; none of it can block an action.
 
 ### Context Resilience
 
@@ -1250,8 +1250,8 @@ survive crashes and context compactions. Previous discussion about written
 sections can be safely compacted.
 
 **Recovery, done by hand:** There is no session-start or pre-compact hook
-here (see `NOTICE`) — open and read `active.md` yourself at the start of a
-session, and write your state to it yourself before compacting.
+here (see `../handbook/guards.md`) — open and read `active.md` yourself at
+the start of a session, and write your state to it yourself before compacting.
 
 **Sprint status tracking:** `production/sprint-status.yaml` is the
 machine-readable story tracker. Written by `/gs-sprint-plan` (init) and
@@ -1650,8 +1650,8 @@ conflicts go to `producer`.
 
 4. **Compact proactively.** At ~65-70% context usage, run `/compact`.
    There is no pre-compact hook to save your progress automatically (see
-   `NOTICE`) — write it to file yourself. Do not wait until you are at the
-   limit.
+   `../handbook/guards.md`) — write it to file yourself. Do not wait until
+   you are at the limit.
 
 5. **Use the right tier of agent.** Do not ask `creative-director` to write a
    shader. Do not ask `qa-tester` to make design decisions. The hierarchy

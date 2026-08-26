@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { isSkillName } from "@deepseek-ai/dsh-skill";
@@ -258,5 +258,37 @@ describe("G1/G2 cover every content/ directory except orchestration/, at any nes
   it("would wrongly flag the real orchestration/ tree if it were ever scanned this way", () => {
     const problems = checkNoMarkersTree(`${contentDir()}orchestration/`);
     expect(problems.map((p) => p.kind)).toContain("marker-leak");
+  });
+});
+
+describe("no leftover `NOTICE` residue under content/", () => {
+  // fixupClaudeDocResidue (tools/port/port.mjs) rewrites every "see NOTICE"
+  // hook-degradation mention into a resolvable relative link to
+  // handbook/guards.md via literal FROM/TO string blocks. Those blocks
+  // silently no-op the moment the upstream source text they match drifts
+  // even one byte (already happened twice in this phase — see the CRLF
+  // snapshot finding in this task's report) — nothing else in the pipeline
+  // would catch a stale matcher, because a bare `NOTICE` token was never a
+  // resolvable link in the first place and so was never in G3's referential-
+  // integrity scan. This test reads the real shipped content/ tree at test
+  // time, independent of port.mjs's own matchers, so a stale literal fails
+  // loudly here instead of shipping a dead pointer.
+  it("finds zero `NOTICE` occurrences anywhere under the real content/ tree", () => {
+    const root = contentDir();
+    const offenders: string[] = [];
+    const walk = (relDir: string): void => {
+      for (const entry of readdirSync(`${root}${relDir}`)) {
+        const relPath = `${relDir}${entry}`;
+        if (statSync(`${root}${relPath}`).isDirectory()) {
+          walk(`${relPath}/`);
+          continue;
+        }
+        if (!entry.endsWith(".md")) continue;
+        const text = readFileSync(`${root}${relPath}`, "utf8");
+        if (text.includes("`NOTICE`")) offenders.push(relPath);
+      }
+    };
+    walk("");
+    expect(offenders).toEqual([]);
   });
 });

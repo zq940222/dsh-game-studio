@@ -375,7 +375,7 @@ git add [src/ and tests/ files changed during implementation] [story-file-path]
 git commit -m "feat: [story title] ([TR-ID])"
 ```
 
-There is no commit-validation hook on this harness to do this automatically (see `NOTICE`) — verify design doc references and check for hardcoded values yourself before running this commit.
+There is no commit-validation hook on this harness to do this automatically (see `../../handbook/guards.md`) — verify design doc references and check for hardcoded values yourself before running this commit.
 
 ### Session State Update
 

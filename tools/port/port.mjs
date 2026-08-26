@@ -294,8 +294,8 @@ function fixupClaudeDocResidue(text, outName) {
       ">",
       "> This guide walks you through every phase of game development using the",
       "> 49-agent system, 73 slash commands, and a set of coordination checklists",
-      "> (see `NOTICE` for what upstream's 12 automated hooks became on this",
-      "> harness). It assumes you are working from the project root.",
+      "> (see `../handbook/guards.md` for what upstream's 12 automated hooks",
+      "> became on this harness). It assumes you are working from the project root.",
       ">",
       "> The pipeline has 7 phases. Each phase has a formal gate (`/gate-check`)",
       "> that must pass before you advance. The authoritative phase sequence is",
@@ -343,10 +343,10 @@ function fixupClaudeDocResidue(text, outName) {
       "### Step 3: Understand the Guardrails",
       "",
       "This harness has no pre-tool-use interception, so the upstream project's",
-      "validation hooks are not wired as executable gates here — see `NOTICE`",
-      "for the full mapping. What ships instead are checklists, approval",
-      "prompts, and reminders threaded through the command skills; nothing",
-      "here will stop a bad commit automatically.",
+      "validation hooks are not wired as executable gates here — see",
+      "`../handbook/guards.md` for the full mapping. What ships instead are",
+      "checklists, approval prompts, and reminders threaded through the",
+      "command skills; nothing here will stop a bad commit automatically.",
     ].join("\n"));
     // "Automated Hooks (Safety Net)" lists the 12 upstream shell hooks as a
     // safety net that runs automatically. Same redirection: point at NOTICE
@@ -376,9 +376,9 @@ function fixupClaudeDocResidue(text, outName) {
       "Upstream ran this as 12 automated shell hooks (session start/stop,",
       "pre/post compaction, commit and push validation, agent-start logging,",
       "and more). This harness has no pre-tool-use interception to wire them",
-      "into — see `NOTICE` for the full mapping. Equivalent coverage, where",
-      "it exists at all, comes from checklists and reminders in the command",
-      "skills themselves; none of it can block an action.",
+      "into — see `../handbook/guards.md` for the full mapping. Equivalent",
+      "coverage, where it exists at all, comes from checklists and reminders",
+      "in the command skills themselves; none of it can block an action.",
     ].join("\n"));
     // Step 7.5 (Ship): "the `validate-push` hook will warn you" describes
     // an active enforcement mechanism — the file already says, eighteen
@@ -387,8 +387,8 @@ function fixupClaudeDocResidue(text, outName) {
       "The `validate-push` hook will warn you when pushing to `main` or `develop`.",
       "This is intentional -- release pushes should be deliberate:",
     ].join("\n")).join([
-      "There is no automatic push guard here (see `NOTICE`) — treat pushes to",
-      "`main` or `develop` as deliberate, considered actions:",
+      "There is no automatic push guard here (see `../handbook/guards.md`) —",
+      "treat pushes to `main` or `develop` as deliberate, considered actions:",
     ].join("\n"));
     // "Automatic recovery" (Context Resilience): same contradiction —
     // session-start/pre-compact hooks described as running automatically.
@@ -398,8 +398,8 @@ function fixupClaudeDocResidue(text, outName) {
       "conversation before compaction.",
     ].join("\n")).join([
       "**Recovery, done by hand:** There is no session-start or pre-compact hook",
-      "here (see `NOTICE`) — open and read `active.md` yourself at the start of a",
-      "session, and write your state to it yourself before compacting.",
+      "here (see `../handbook/guards.md`) — open and read `active.md` yourself at",
+      "the start of a session, and write your state to it yourself before compacting.",
     ].join("\n"));
     // Review-round finding (Important 5): same `/clear` defect as
     // context-management.md's identical sentence — see that fixup block's
@@ -426,8 +426,8 @@ function fixupClaudeDocResidue(text, outName) {
       // upstream, but the replacement must not.
       "4. **Compact proactively.** At ~65-70% context usage, run `/compact`.",
       "   There is no pre-compact hook to save your progress automatically (see",
-      "   `NOTICE`) — write it to file yourself. Do not wait until you are at the",
-      "   limit.",
+      "   `../handbook/guards.md`) — write it to file yourself. Do not wait until",
+      "   you are at the limit.",
     ].join("\n"));
     return out;
   }
@@ -552,7 +552,7 @@ function fixupClaudeDocResidue(text, outName) {
     let out = text.split(
       "1. The `session-start.sh` hook will detect and preview `active.md` automatically",
     ).join(
-      "1. There is no session-start hook here to do this automatically (see `NOTICE`) — check `production/session-state/active.md` yourself",
+      "1. There is no session-start hook here to do this automatically (see `guards.md`) — check `production/session-state/active.md` yourself",
     );
     // Review-round finding (Important 5): `/clear` names a Claude Code
     // builtin this installed harness does not register (inventory.mjs
@@ -688,7 +688,7 @@ function fixupClaudeDocResidue(text, outName) {
     out = out.split(
       "The `validate-commit.sh` hook will verify design doc references and check for hardcoded values automatically.",
     ).join(
-      "There is no commit-validation hook on this harness to do this automatically (see `NOTICE`) — verify design doc references and check for hardcoded values yourself before running this commit.",
+      "There is no commit-validation hook on this harness to do this automatically (see `../../handbook/guards.md`) — verify design doc references and check for hardcoded values yourself before running this commit.",
     );
     return out;
   }
@@ -950,6 +950,23 @@ function emit(rel, text) {
   written.push({ path: rel, text: lf });
 }
 
+const STATIC_DIR = fileURLToPath(new URL("./static/", import.meta.url));
+
+/**
+ * Copy one first-party file from tools/port/static/ into the ported tree.
+ *
+ * First-party content cannot simply be hand-written into `handbook/` or
+ * `skills/`: clearOwned() rmSyncs both before every run, so a hand-written
+ * file there survives exactly until the next port. Sourcing it from a
+ * directory the port owns is what makes it reproducible — and routing it
+ * through emit() means G1/G2/G3 cover it like any generated file.
+ * @param staticName - file name under tools/port/static/.
+ * @param outPath - content-relative destination.
+ */
+function emitStatic(staticName, outPath) {
+  emit(outPath, readFileSync(join(STATIC_DIR, staticName), "utf8"));
+}
+
 /**
  * Lines in a frontmatter fragment as returned by {@link splitFm} (the
  * content between the fences, WITHOUT them) or produced by
@@ -1202,6 +1219,15 @@ for (const { rel, full } of walkMd(docsSrcDir)) {
   emit(outPath, rewriteBody(fixedRaw, DEST.DOC, outPath));
   handbookCount++;
 }
+
+// First-party guards.md: the authoritative "what happened to upstream's 12
+// hooks" reference every "(see NOTICE)" mention in the ported corpus now
+// points at. Not upstream content — sourced from tools/port/static/, not
+// the snapshot — so it is emitted here rather than inside the loop above,
+// after every real ported handbook doc, and still counted into handbookCount
+// so G4's handbook total reflects what actually ships.
+emitStatic("guards.md", "handbook/guards.md");
+handbookCount++;
 
 // 7. Pipeline: workflow-catalog.yaml (converted) + WORKFLOW-GUIDE.md.
 const catalogRaw = readFileSync(join(snapshot, ".claude/docs/workflow-catalog.yaml"), "utf8");

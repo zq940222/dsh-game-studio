@@ -21,7 +21,7 @@ directory itself.
 | `%%GS_CONTENT_DIR%%rules/` | 11 path-scoped coding standards | 11 of 11 installed |
 | `%%GS_CONTENT_DIR%%templates/` | 40 document templates | 40 of 40 installed |
 | `%%GS_CONTENT_DIR%%engines/` | Godot / Unity / Unreal reference | 46 of 46 installed |
-| `%%GS_CONTENT_DIR%%handbook/` | Roster, gates, coordination rules, guards | 12 of 12 installed |
+| `%%GS_CONTENT_DIR%%handbook/` | Roster, gates, coordination rules, guards | 13 of 13 installed |
 | `%%GS_CONTENT_DIR%%pipeline/` | The 7-phase workflow catalog and the full walkthrough guide | 2 of 2 installed |
 | `%%GS_CONTENT_DIR%%skills/` | The studio commands, one directory each | 74 of 74 installed (73 ported + `gs-ping`) |
 
