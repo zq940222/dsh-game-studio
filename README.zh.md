@@ -94,10 +94,10 @@ dsh --profile game-studio
 | `engine` | `"auto" \| "godot" \| "unity" \| "ue5"` | `"auto"` | 被替换进 `gs-studio` 定向技能里，作为当前引擎显示。各引擎参考手册（`content/engines/`）已经上线；用这个值在它们之间自动挑选的机制还没接上。 |
 | `reviewIntensity` | `"full" \| "lean" \| "solo"` | `"full"` | 被替换进 `gs-studio` 定向技能里，作为当前审校强度显示。会消费这个值的流水线阶段还没上线（Phase 3）。 |
 | `watch` | `boolean` | `false` | 不重启 harness、重新扫描 `content/skills/` 的变化。发行的内容是不可变的——除非你在开发本插件本身，否则保持 `false`。 |
+| `exposeCommandSkillsToModel` | `boolean` | `false` | 可选逃生舱。为 `true` 时，全部 74 条命令技能会**额外**以运行时技能的形式注册为模型可调用——覆盖它们自己 frontmatter 里的 `disable-model-invocation: true`，是叠加在 12 条编排技能之上，而不是取代它们。这与本包默认的、经过实测的设计主张（见下文"共享 profile 的代价"）正好相反；除非你确实想让模型能直接调用工作室命令，否则请保持 `false`。 |
 
 这是本阶段实现的全部配置项。设计文档里别处提到的其它字段
-（`exposeCommandSkillsToModel`、`modelTiers`、`guards`）属于本移植的后续
-阶段，在这一版里并不存在。
+（`modelTiers`、`guards`）属于本移植的后续阶段，在这一版里并不存在。
 
 ## 共享 profile 的代价
 

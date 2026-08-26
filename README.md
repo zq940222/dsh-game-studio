@@ -107,11 +107,11 @@ id this package's own `cordis.patch.yml` inserts:
 | `engine` | `"auto" \| "godot" \| "unity" \| "ue5"` | `"auto"` | Substituted into the `gs-studio` orientation skill as the active engine. The per-engine reference handbooks (`content/engines/`) are shipped; automatic selection between them by this value is not wired up yet. |
 | `reviewIntensity` | `"full" \| "lean" \| "solo"` | `"full"` | Substituted into the `gs-studio` orientation skill as the active review intensity. The pipeline stages that will act on it are not shipped yet (Phase 3). |
 | `watch` | `boolean` | `false` | Re-scans `content/skills/` for changes without restarting the harness. The shipped content is immutable — leave this `false` unless you are developing this plugin itself. |
+| `exposeCommandSkillsToModel` | `boolean` | `false` | Opt-in escape hatch. When `true`, all 74 command skills are *also* registered as model-invocable runtime skills, overriding their own `disable-model-invocation: true` frontmatter — on top of, not instead of, the 12 orchestration skills. This is the opposite of this package's default and measured design claim (see "The cost of a shared profile" below); leave it `false` unless you specifically want the model able to invoke studio commands directly. |
 
 These are the only configuration keys this phase implements. Other keys you
-may see referenced elsewhere in the design (`exposeCommandSkillsToModel`,
-`modelTiers`, `guards`) belong to later phases of this port and do not
-exist in this release.
+may see referenced elsewhere in the design (`modelTiers`, `guards`) belong
+to later phases of this port and do not exist in this release.
 
 ## The cost of a shared profile
 

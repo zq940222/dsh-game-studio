@@ -13,6 +13,7 @@ import type { Context } from "@deepseek-ai/cordis";
 import * as SkillFilesystem from "@deepseek-ai/dsh-skill-filesystem";
 import { contentDir } from "./content.js";
 import { loadOrchestrationDir } from "./orchestration.js";
+import { loadCommandSkillsForModel } from "./commandSkills.js";
 
 /** Cordis plugin identity. The patch row's `name` resolves to this module. */
 export const name = "game-studio";
@@ -23,6 +24,16 @@ export interface ConfigType {
   engine: "auto" | "godot" | "unity" | "ue5";
   reviewIntensity: "full" | "lean" | "solo";
   watch: boolean;
+  /**
+   * Opt-in escape hatch. Off by default: the plugin's measured design
+   * claim is 12 model-visible orchestration skills and 74 command skills
+   * that cost the model catalog nothing (human-invocable only, served by
+   * the filesystem provider). Turning this on re-registers all 74 command
+   * skills as model-invocable runtime skills too — see
+   * `commandSkills.ts` for the mechanism and why the override is
+   * deliberate, not a bug.
+   */
+  exposeCommandSkillsToModel: boolean;
 }
 
 export const Config: Schemastery<any, ConfigType> = z.object({
@@ -38,6 +49,7 @@ export const Config: Schemastery<any, ConfigType> = z.object({
     z.const("solo"),
   ]).default("full"),
   watch: z.boolean().default(false),
+  exposeCommandSkillsToModel: z.boolean().default(false),
 });
 
 export function apply(ctx: Context, config: ConfigType): void {
@@ -61,4 +73,15 @@ export function apply(ctx: Context, config: ConfigType): void {
     reviewIntensity: config.reviewIntensity,
   });
   for (const skill of orchestration) ctx.skills.register(skill);
+
+  // Opt-in escape hatch, off by default (see ConfigType's doc comment).
+  // Runtime registrations land at rank 250, which beats the filesystem
+  // provider's rank-300 copy of the same skill name mounted just above —
+  // each re-registration here shadows (not duplicates) its filesystem
+  // twin, and the shadowed copy is logged and hidden by the skill
+  // registry, not an error.
+  if (config.exposeCommandSkillsToModel) {
+    const commandSkills = loadCommandSkillsForModel(`${content}skills/`);
+    for (const skill of commandSkills) ctx.skills.register(skill);
+  }
 }

@@ -16,6 +16,7 @@ describe("plugin identity", () => {
     expect(resolved.engine).toBe("auto");
     expect(resolved.reviewIntensity).toBe("full");
     expect(resolved.watch).toBe(false);
+    expect(resolved.exposeCommandSkillsToModel).toBe(false);
   });
 
   it("rejects an unknown engine", () => {
@@ -167,6 +168,81 @@ describe("orchestration skills", () => {
     for (const s of registered) {
       expect(s.description).not.toContain("/");
       expect(s.description.length).toBeLessThan(320);
+    }
+  });
+});
+
+describe("exposeCommandSkillsToModel", () => {
+  it("defaults to keeping command skills out of the model catalog", () => {
+    expect(new Config({}).exposeCommandSkillsToModel).toBe(false);
+  });
+
+  it("when off, registers only the twelve orchestration skills", () => {
+    const registered: OrchestrationSkill[] = [];
+    const ctx = {
+      plugin: () => {},
+      skills: { register: (s: OrchestrationSkill) => { registered.push(s); return () => {}; } },
+      logger: { error: () => {}, warn: () => {} },
+    } as unknown as Parameters<typeof apply>[0];
+    apply(ctx, new Config({}));
+    expect(registered).toHaveLength(12);
+  });
+
+  it("when on, also registers the command skills as model-invocable", () => {
+    const registered: OrchestrationSkill[] = [];
+    const ctx = {
+      plugin: () => {},
+      skills: { register: (s: OrchestrationSkill) => { registered.push(s); return () => {}; } },
+      logger: { error: () => {}, warn: () => {} },
+    } as unknown as Parameters<typeof apply>[0];
+    apply(ctx, new Config({ exposeCommandSkillsToModel: true }));
+    expect(registered.length).toBeGreaterThan(12);
+    const ping = registered.find((s) => s.name === "gs-ping");
+    expect(ping?.invocation).toEqual({ modelInvocable: true, userInvocable: true });
+  });
+
+  it("registers all 74 command skills, plus the 12 orchestration skills, when on", () => {
+    const registered: OrchestrationSkill[] = [];
+    const ctx = {
+      plugin: () => {},
+      skills: { register: (s: OrchestrationSkill) => { registered.push(s); return () => {}; } },
+      logger: { error: () => {}, warn: () => {} },
+    } as unknown as Parameters<typeof apply>[0];
+    apply(ctx, new Config({ exposeCommandSkillsToModel: true }));
+    expect(registered).toHaveLength(12 + 74);
+  });
+
+  it("re-registered command skills keep their frontmatter metadata (argument-hint, model, agent)", () => {
+    const registered: OrchestrationSkill[] = [];
+    const ctx = {
+      plugin: () => {},
+      skills: { register: (s: OrchestrationSkill) => { registered.push(s); return () => {}; } },
+      logger: { error: () => {}, warn: () => {} },
+    } as unknown as Parameters<typeof apply>[0];
+    apply(ctx, new Config({ exposeCommandSkillsToModel: true }));
+    const adopt = registered.find((s) => s.name === "gs-adopt");
+    expect(adopt?.metadata).toEqual({
+      "argument-hint": "[focus: full | gdds | adrs | stories | infra]",
+      model: "sonnet",
+      agent: "technical-director",
+    });
+  });
+
+  it("re-registered command skills carry no unsubstituted %%GS_ marker and no \\r", () => {
+    const registered: OrchestrationSkill[] = [];
+    const ctx = {
+      plugin: () => {},
+      skills: { register: (s: OrchestrationSkill) => { registered.push(s); return () => {}; } },
+      logger: { error: () => {}, warn: () => {} },
+    } as unknown as Parameters<typeof apply>[0];
+    apply(ctx, new Config({ exposeCommandSkillsToModel: true }));
+    const commandSkills = registered.filter((s) => s.name !== "gs-ping" && !s.name.startsWith("gs-phase-") &&
+      !["gs-guards", "gs-pipeline", "gs-roster", "gs-studio", "gs-templates"].includes(s.name));
+    expect(commandSkills.length).toBeGreaterThan(0);
+    for (const s of commandSkills) {
+      expect(s.content).not.toContain("%%GS_");
+      expect(s.content).not.toContain("\r");
+      expect(s.source).toBe("runtime");
     }
   });
 });

@@ -14,6 +14,10 @@ import { parse as parseYaml } from "yaml";
 /**
  * One runtime skill contribution, shaped to `ctx.skills.register()`'s
  * `SkillRegistration`: the body field is `content`, and `source` is required.
+ * `metadata`/`whenToUse` are optional passthroughs — the orchestration
+ * loader below never sets them, but `commandSkills.ts` reuses this same
+ * type for its own registrations and does, so the field lives here rather
+ * than in a second near-duplicate interface.
  */
 export interface OrchestrationSkill {
   name: string;
@@ -22,6 +26,8 @@ export interface OrchestrationSkill {
   source: "runtime";
   resourceBase: { kind: "directory"; path: string };
   invocation: { modelInvocable: boolean; userInvocable: boolean };
+  metadata?: Record<string, unknown>;
+  whenToUse?: string;
 }
 
 export interface SubstitutionVars {
