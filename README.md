@@ -47,15 +47,32 @@ exactly which keys this phase implements.
 
 ## Installation
 
-Two routes, depending on whether you want this in a profile you already use
-day to day, or walled off in its own.
+This package is not on the npm registry. Install it from the release
+tarball attached to its GitHub release:
+
+```bash
+dsh plugin --profile web add https://github.com/zq940222/dsh-game-studio/releases/download/v0.1.0/dsh-game-studio-0.1.0.tgz
+dsh web
+```
+
+That tarball ships `lib/` prebuilt, so the install needs no build step, no
+`allowBuilds` entry, and no SSH access to GitHub. Installing from the git
+URL instead (`git+https://github.com/…`) works but is markedly worse: pnpm
+resolves git dependencies through `git ls-remote` over **SSH** even when
+you hand it an HTTPS URL, so it fails outright on any network that blocks
+port 22 or on any machine without a GitHub SSH key, and it additionally
+requires an `allowBuilds` entry pinned to the exact commit SHA — which
+changes on every push. Prefer the release tarball.
+
+To upgrade later, run the same command against a newer release tag.
+
+Below, two routes, depending on whether you want this in a profile you
+already use day to day, or walled off in its own.
 
 ### Route 1: install into an existing profile (recommended)
 
-```bash
-dsh plugin --profile web add dsh-game-studio
-dsh web
-```
+The command above already does this. It targets the `web` profile; swap in
+whichever profile name you use.
 
 `dsh plugin` reads this package's `dsh.bundle` declaration and reconciles
 it into the profile's `dsh.profile.bundles` list itself — no manual editing
@@ -64,7 +81,7 @@ of `package.json` required.
 ### Route 2: a dedicated, isolated profile
 
 ```bash
-dsh plugin --profile game-studio add dsh-game-studio
+dsh plugin --profile game-studio add https://github.com/zq940222/dsh-game-studio/releases/download/v0.1.0/dsh-game-studio-0.1.0.tgz
 ```
 
 This creates a brand-new profile. A freshly created profile is seeded with

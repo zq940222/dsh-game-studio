@@ -40,14 +40,28 @@ agent/skill/hook/rule 扩展点之上。本包把那个项目的形态重新表�
 
 ## 安装
 
-两条路线，取决于你想把它装进日常在用的 profile，还是单独隔离出一个。
+本包没有发布到 npm registry。从 GitHub release 附带的 tarball 安装：
+
+```bash
+dsh plugin --profile web add https://github.com/zq940222/dsh-game-studio/releases/download/v0.1.0/dsh-game-studio-0.1.0.tgz
+dsh web
+```
+
+该 tarball 自带构建好的 `lib/`，所以安装时不需要构建步骤、不需要
+`allowBuilds` 条目，也不需要能连上 GitHub 的 SSH。改用 git URL
+（`git+https://github.com/…`）也能装，但明显更差：pnpm 解析 git 依赖时
+会走 `git ls-remote` 并规范化成 **SSH**——即使你给的是 HTTPS 地址也一样，
+所以在任何封了 22 端口的网络下、或任何没配 GitHub SSH key 的机器上都会
+直接失败；而且它还额外要求一个钉在确切 commit SHA 上的 `allowBuilds`
+条目，每推一次新提交就得改一次。优先用 release tarball。
+
+以后升级，把同一条命令指向更新的 release tag 即可。
+
+下面是两条路线，取决于你想把它装进日常在用的 profile，还是单独隔离出一个。
 
 ### 路线一：装进已有 profile（推荐）
 
-```bash
-dsh plugin --profile web add dsh-game-studio
-dsh web
-```
+上面那条命令就是。它针对的是 `web` profile，换成你自己在用的 profile 名即可。
 
 `dsh plugin` 会读取本包的 `dsh.bundle` 声明，自己把它归并进该 profile 的
 `dsh.profile.bundles` 列表——不需要手动编辑 `package.json`。
@@ -55,7 +69,7 @@ dsh web
 ### 路线二：单独的隔离 profile
 
 ```bash
-dsh plugin --profile game-studio add dsh-game-studio
+dsh plugin --profile game-studio add https://github.com/zq940222/dsh-game-studio/releases/download/v0.1.0/dsh-game-studio-0.1.0.tgz
 ```
 
 这条命令会新建一个 profile。一个刚创建的 profile 的 `dsh.profile.bundles`
