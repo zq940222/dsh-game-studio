@@ -96,6 +96,13 @@ const crlfSample = CRLF_SAMPLE_FILES
   .map((rel) => join(snapshot, rel))
   .filter((abs) => existsSync(abs))
   .map((abs) => ({ path: abs, text: readFileSync(abs, "utf8") }));
+// The .filter(existsSync) above makes an all-missing sample silently pass
+// zero problems rather than failing — a snapshot with none of these four
+// files present must not sail through this guard vacuously.
+if (crlfSample.length === 0) {
+  console.error(`port: CRLF guard sample is empty — none of the ${CRLF_SAMPLE_FILES.length} sampled files exist in this snapshot, so line endings cannot be verified`);
+  process.exit(2);
+}
 const crlfProblems = checkSnapshotLineEndings(crlfSample);
 if (crlfProblems.length > 0) {
   console.error(`port: CRLF snapshot detected — ${crlfProblems.length} problem(s):`);
@@ -995,7 +1002,13 @@ const STATIC_DIR = fileURLToPath(new URL("./static/", import.meta.url));
  * `skills/`: clearOwned() rmSyncs both before every run, so a hand-written
  * file there survives exactly until the next port. Sourcing it from a
  * directory the port owns is what makes it reproducible — and routing it
- * through emit() means G1/G2/G3 cover it like any generated file.
+ * through emit() means G2 (LF normalization) and G3 (referential
+ * integrity, via `written`) cover it like any generated file. NOT G1:
+ * `checkMarkerLeaks` only re-walks `content/skills/**` from disk (see the
+ * G1 call site below), so a static file emitted outside that tree — e.g.
+ * `handbook/guards.md` — is invisible to it at port time. `pnpm
+ * lint:content` is what actually scans `handbook/` for a leaked %%GS_
+ * marker or a stray \r, at lint time rather than port time.
  * @param staticName - file name under tools/port/static/.
  * @param outPath - content-relative destination.
  */

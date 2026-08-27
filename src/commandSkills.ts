@@ -101,6 +101,20 @@ export function loadCommandSkillForModel(
     // Deliberate override — see module doc. This file's own frontmatter
     // says disable-model-invocation: true / user-invocable: true; the
     // whole reason this loader runs is to expose it to the model anyway.
+    //
+    // Both booleans are hardcoded, not read from `front` — this ignores
+    // whatever the file's own frontmatter actually declares for either
+    // key. Harmless today: all 74 shipped command skills uniformly
+    // declare `disable-model-invocation: true` + `user-invocable: true`,
+    // so forcing modelInvocable true only ever ADDS model access on top
+    // of unchanged user access. `checkSkillDir` (src/content.ts) only
+    // validates that these keys are well-formed booleans, never their
+    // value, so nothing else in this codebase would catch it if that
+    // uniformity stopped holding. A future command skill authored with
+    // `user-invocable: false` (e.g. something meant to be model-only)
+    // would be silently forced back to userInvocable: true the moment
+    // this flag is on — this hardcode has no way to tell "override
+    // model-invocability" apart from "override user-invocability too".
     invocation: { modelInvocable: true, userInvocable: true },
     ...(metadata !== undefined ? { metadata } : {}),
     ...(whenToUse !== undefined ? { whenToUse } : {}),
