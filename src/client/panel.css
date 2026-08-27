@@ -1,9 +1,10 @@
 /*
- * Task 3 probe styles. Loaded through esbuild's `text` loader (see
- * tools/client/build-client.mjs) and injected as a single <style> tag at
- * mount time — not CSS modules: the class-name obfuscation CSS modules add
- * is debugging cost this two-class probe doesn't earn. Every class is
- * `gs-`-prefixed to stay out of the host shell's own class names.
+ * Panel shell + commands tab styles. Loaded through esbuild's `text` loader
+ * (see tools/client/build-client.mjs) and injected as a single <style> tag
+ * by Panel.tsx at component-mount time — not CSS modules: the panel is a
+ * small, self-contained tree and the class-name obfuscation CSS modules add
+ * is debugging cost it doesn't earn. Every class is `gs-`-prefixed to stay
+ * out of the host shell's own (hashed) class names.
  */
 
 .gs-entry {
@@ -27,14 +28,147 @@
   right: 16px;
   bottom: 16px;
   z-index: 9999;
-  padding: 10px 14px;
-  border-radius: 8px;
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  height: min(70vh, 640px);
+  border-radius: 10px;
   background: #1e1e1e;
   color: #fff;
   font: 13px/1.4 system-ui, sans-serif;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
 }
 
 .gs-panel[hidden] {
   display: none;
+}
+
+.gs-panel-body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.gs-panel-header {
+  flex: none;
+  padding: 12px 14px 8px;
+}
+
+.gs-panel-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.gs-tabs {
+  flex: none;
+  display: flex;
+  gap: 4px;
+  padding: 0 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.gs-tab {
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  color: rgba(255, 255, 255, 0.65);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+
+.gs-tab:hover {
+  color: #fff;
+}
+
+.gs-tab-active {
+  color: #fff;
+  border-bottom-color: #5b9dff;
+}
+
+.gs-tab-panel {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 8px 14px 14px;
+}
+
+.gs-panel-summary {
+  margin: 6px 0 10px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+}
+
+.gs-commands {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.gs-command-group-title {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.gs-command-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gs-command-row {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.gs-command-row:hover {
+  background: rgba(127, 127, 127, 0.15);
+}
+
+.gs-command-name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: #5b9dff;
+}
+
+.gs-command-desc {
+  margin-top: 2px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.65);
+  /* Two-line clamp: the longest shipped command description runs 400+ chars. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.gs-roles-empty {
+  padding: 18px 4px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.gs-roles-empty-title {
+  margin: 0 0 6px;
+  font-weight: 600;
+}
+
+.gs-roles-empty-body {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.6);
 }
