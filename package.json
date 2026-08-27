@@ -2,22 +2,56 @@
   "name": "dsh-game-studio",
   "version": "0.1.0",
   "description": "A game studio for DeepSeek Harness: a full port of Claude-Code-Game-Studios' 49-role, 74-command (73 studio commands + gs-ping probe), 7-phase studio (skill provider, 12 orchestration skills, 74 command skills, 49 role briefs, 40 templates, 11 rules, 46 engine docs, 13 handbook docs)",
-  "keywords": ["dsh-plugin", "deepseek-harness", "game-development", "godot", "unity", "unreal", "skills"],
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "game-development",
+    "godot",
+    "unity",
+    "unreal",
+    "skills"
+  ],
   "license": "MIT",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "exports": {
-    ".": { "types": "./lib/index.d.ts", "default": "./lib/index.js" },
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
-  "files": ["lib", "content", "cordis.patch.yml", "NOTICE", "LICENSE", "LICENSE.upstream", "README.md", "README.zh.md"],
-  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } },
+  "files": [
+    "lib",
+    "content",
+    "cordis.patch.yml",
+    "NOTICE",
+    "LICENSE",
+    "LICENSE.upstream",
+    "README.md",
+    "README.zh.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [],
+      "platform": "web"
+    }
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "node tools/catalog/build-catalog.mjs --emit src/client/catalog.generated.ts && tsc -p tsconfig.json && tsc -p tsconfig.client.json && node tools/client/build-client.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit",
     "test": "vitest run",
     "lint:content": "node scripts/lint-content.mjs",
     "check": "pnpm build && pnpm test && pnpm lint:content",
@@ -28,18 +62,34 @@
     "@deepseek-ai/dsh-skill": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-skill-filesystem": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-tool-subagent": "^0.1.0-rc.6",
-    "@deepseek-ai/schemastery": "^3.18.1"
+    "@deepseek-ai/schemastery": "^3.18.1",
+    "@deepseek-ai/dsh-client-runtime": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-connection": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-ui-slots": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-locale": "^0.1.0-rc.6",
+    "react": "^18.2.0"
   },
   "dependencies": {
     "yaml": "^2.5.0"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-client-connection": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-locale": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-runtime": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-ui-slots": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-skill": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-skill-filesystem": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-tool-subagent": "^0.1.0-rc.6",
     "@deepseek-ai/schemastery": "^3.18.1",
     "@types/node": "^22.0.0",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "esbuild": "^0.28.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "typescript": "^5.5.0",
     "vitest": "^3.0.0"
   }
