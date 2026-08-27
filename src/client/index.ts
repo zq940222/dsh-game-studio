@@ -1,5 +1,5 @@
 /**
- * dsh-game-studio web client plugin: panel shell + commands tab.
+ * dsh-game-studio web client plugin: panel shell + commands/roles tabs.
  *
  * Extends Task 3's proven mount (sidebar entry + floating panel, both raw
  * DOM against the shell's rendered markup — see that file's history for why:
@@ -70,6 +70,57 @@
  * the reference package's own manifest, to be the package that supplies
  * the `sessions` service).
  *
+ * ## Delegate prefill: `ctx.conversation.setDraft` doesn't exist either
+ *
+ * Task 5's brief has the delegate button call
+ * `ctx.conversation.setDraft(\`按 gs-roster 协议委派给 ${'{'}role{'}'}：\`)`
+ * directly on the root context. That call was never exercised at runtime —
+ * the brief's own design doc lifted it from `SessionInputResolver`'s type
+ * definition — and it fails the same way `ctx.conversation.send` failed
+ * above: `setDraft` isn't even a method on `IConversation`
+ * (`dsh-client-ui-conversation/client`'s `service.d.ts`); it lives on
+ * `SessionInput`, the per-session facade `IConversation.input.for(actx)`
+ * resolves, one level deeper than the brief's snippet reaches.
+ *
+ * The proven path, read out of the shipped
+ * `@linxin666/dsh-client-ui-aionui-panel`'s own composer-drop-target code
+ * (`src/client/index.ts`'s `conversation.input.dock` inject, which calls
+ * this exact sequence to splice a dragged file path into the draft):
+ *
+ * ```ts
+ * const actx  = ctx.sessions.scope(sessionId); // scoped ctx; undefined if no session
+ * const shell = ctx.conversation.input.for(actx); // SessionInputResolver.for()
+ * const draft = shell.state.getSnapshot().draft;  // read the existing draft first
+ * shell.setDraft(withDelegationPrefix(draft, prefix)); // insert, never overwrite
+ * ```
+ *
+ * Two things worth calling out, both load-bearing:
+ *
+ * - `conversation` is read off **this plugin's own `ctx`** (where the
+ *   fiber inject below actually grants it), never off `actx` — `actx` is
+ *   only ever used as the *argument* to `input.for(...)`. Dereferencing
+ *   `.conversation` on `actx` itself would repeat the exact structural
+ *   failure the command-dispatch section above already hit for
+ *   `ctx.sessions.scope(id).conversation`: `actx` is a scoped context
+ *   rooted under `SessionRuntime`'s own fiber, nowhere near where
+ *   `dsh-client-ui-conversation` provides the service.
+ * - The reference reads the draft before writing it and inserts into it.
+ *   The brief's literal `setDraft(prefix)` would silently discard
+ *   whatever the user had already typed — `withDelegationPrefix` below
+ *   prepends instead (and is idempotent for the same role's prefix, so a
+ *   double-click or a re-delegate to the same role doesn't stack it).
+ *
+ * Unlike `"conversation"` in the command-dispatch section above (dropped
+ * entirely — nothing in that path ever needed it), the delegate path
+ * really does need the `conversation` service, so `"conversation"` is
+ * added to `export const inject` below and to `package.json`'s
+ * `dsh.client.inject` alongside `@deepseek-ai/dsh-client-ui-conversation`
+ * (confirmed, via `dsh-web-app`'s own `package.json`, to be one of its
+ * hard dependencies — not an optional sibling plugin — so gating this
+ * fiber's `apply()` on it carries the same low risk `"sessions"` already
+ * does, not the unbounded-hang risk the trap below warns about for an
+ * optional service).
+ *
  * ## The inject trap (carried from Task 3's review)
  *
  * A service named in `export const inject` gates `apply()`: it will not run
@@ -100,6 +151,8 @@ import { createRoot, type Root } from "react-dom/client";
 import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
 // Type-only: merges `locale: LocaleRuntime` onto cordis Context and pulls in LocaleNamespaceMap.
 import type {} from "@deepseek-ai/dsh-client-locale/client";
+// Type-only: merges `conversation: IConversation` onto cordis Context (see the module doc's "delegate prefill" section).
+import type {} from "@deepseek-ai/dsh-client-ui-conversation/client";
 import { Panel } from "./Panel.js";
 import { en, NS, zh, type GameStudioKey } from "./locales.js";
 
@@ -127,8 +180,8 @@ function releaseApply(): void {
   globalThis.__dshGameStudioApplied = undefined;
 }
 
-/** Required services: see the module doc for why each one is here (and why "conversation" isn't). */
-export const inject: string[] = ["sessions", "locale"];
+/** Required services: see the module doc for why each one is here — "conversation" is for the delegate-prefill path only ("send" was dropped). */
+export const inject: string[] = ["sessions", "locale", "conversation"];
 
 const ENTRY_ATTR = "data-dsh-game-studio-entry";
 
@@ -204,16 +257,21 @@ function mountSidebarEntry(label: string, onToggle: () => void): () => void {
  * @param ctx - client context (passed through for the locale service; the
  * panel re-binds its own `t` on every render — see Panel.tsx).
  * @param onPick - what a command row's click does.
+ * @param onDelegate - what a role card's delegate button does.
  * @returns a toggle function and a disposer.
  */
-function mountPanel(ctx: ClientContext, onPick: (name: string) => void): { toggle: () => void; dispose: () => void } {
+function mountPanel(
+  ctx: ClientContext,
+  onPick: (name: string) => void,
+  onDelegate: (role: string) => void,
+): { toggle: () => void; dispose: () => void } {
   const el = document.createElement("div");
   el.className = "gs-panel";
   el.hidden = true;
   document.body.appendChild(el);
 
   const root: Root = createRoot(el);
-  root.render(createElement(Panel, { locale: ctx.locale, onPick }));
+  root.render(createElement(Panel, { locale: ctx.locale, onPick, onDelegate }));
 
   return {
     toggle: () => {
@@ -263,8 +321,78 @@ function makeOnPick(ctx: ClientContext): (name: string) => void {
 }
 
 /**
+ * Inserts a delegation prefix into an existing draft rather than
+ * overwriting it. A click that silently discarded whatever the user had
+ * already typed would be a bug, not a shortcut (see the module doc's
+ * "delegate prefill" section). Idempotent for the exact prefix already
+ * leading the draft — a double-click, or re-delegating to the same role,
+ * does not stack it; delegating to a *different* role after that still
+ * prepends its own prefix rather than replacing the first one (the brief
+ * does not specify this case; preserving content wins over de-duplicating
+ * it).
+ * @param draft - the current composer draft.
+ * @param prefix - the localized delegation prefix for one role.
+ * @returns the next draft to write back with `setDraft`.
+ */
+function withDelegationPrefix(draft: string, prefix: string): string {
+  if (draft.startsWith(prefix)) return draft;
+  return draft === "" ? prefix : `${prefix}${draft}`;
+}
+
+/**
+ * Best-effort fallback when the draft cannot be reached (no active
+ * session, or the `conversation` service errors at call time): copies the
+ * delegation prefix to the clipboard instead of losing it. Chosen over
+ * `SessionInput.beginCommand` — that verb exists for the composer's
+ * slash-command trigger machinery (it takes a `CommandClaim` + `TokenSpan`
+ * naming an in-progress `/token` match), not for placing arbitrary text;
+ * a role delegation is not a slash command, so it does not fit.
+ * @param text - the text to copy.
+ */
+function copyDelegatePrefixToClipboard(text: string): void {
+  navigator.clipboard.writeText(text).catch((error: unknown) => {
+    console.error("[dsh-game-studio] clipboard write failed", error);
+  });
+}
+
+/**
+ * Builds the role-card delegate button's click handler. See the module
+ * doc's "delegate prefill" section for why this is
+ * `sessions.scope(id)` + `conversation.input.for(actx)` + a read-then-write
+ * `setDraft`, not the brief's bare `ctx.conversation.setDraft(...)` (that
+ * method does not exist on `IConversation` at all).
+ * @param ctx - client context (`sessions`, `conversation`, `locale` injected).
+ * @param t - bound translator (identity is stable; it reads the active
+ * locale at call time — see `LocaleRuntime.bind`'s own doc comment — so
+ * reusing the one instance `apply()` already created stays fresh across
+ * a later locale switch, same as `Panel.tsx`'s own `t`).
+ * @returns handler for a role name (prefills, never sends).
+ */
+function makeOnDelegate(ctx: ClientContext, t: (key: GameStudioKey, params?: Record<string, unknown>) => string): (role: string) => void {
+  return (role: string) => {
+    const prefix = t("role.delegatePrefix", { role });
+    const sessionId = ctx.sessions.list.getSnapshot().current;
+    const actx = sessionId === undefined ? undefined : ctx.sessions.scope(sessionId);
+    if (actx === undefined) {
+      console.warn(`[dsh-game-studio] no active session — copying the delegate prefix for ${role} to the clipboard instead`);
+      copyDelegatePrefixToClipboard(prefix);
+      return;
+    }
+    try {
+      const shell = ctx.conversation.input.for(actx);
+      const draft = shell.state.getSnapshot().draft;
+      shell.setDraft(withDelegationPrefix(draft, prefix));
+    } catch (error) {
+      // Log, never throw: a failed prefill must degrade the panel, not the GUI.
+      console.error(`[dsh-game-studio] delegate prefill failed for ${role}`, error);
+      copyDelegatePrefixToClipboard(prefix);
+    }
+  };
+}
+
+/**
  * Client plugin entry point.
- * @param ctx - client cordis context (`sessions`, `locale` injected).
+ * @param ctx - client cordis context (`sessions`, `locale`, `conversation` injected).
  */
 export function apply(ctx: ClientContext): void {
   if (!claimApply()) return;
@@ -276,9 +404,10 @@ export function apply(ctx: ClientContext): void {
 
   const t = ctx.locale.bind(NS);
   const onPick = makeOnPick(ctx);
+  const onDelegate = makeOnDelegate(ctx, t);
 
   ctx.effect(() => {
-    const panel = mountPanel(ctx, onPick);
+    const panel = mountPanel(ctx, onPick, onDelegate);
     const disposeEntry = mountSidebarEntry(t("entry.label"), panel.toggle);
     return () => {
       disposeEntry();

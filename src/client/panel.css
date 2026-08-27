@@ -158,17 +158,118 @@
   overflow: hidden;
 }
 
-.gs-roles-empty {
-  padding: 18px 4px;
-  color: rgba(255, 255, 255, 0.75);
+.gs-roles {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
-.gs-roles-empty-title {
+.gs-role-group-title {
   margin: 0 0 6px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
 }
 
-.gs-roles-empty-body {
+.gs-role-list {
+  list-style: none;
   margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gs-role-item {
+  border-radius: 6px;
+}
+
+.gs-role-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.gs-role-row:hover {
+  background: rgba(127, 127, 127, 0.15);
+}
+
+.gs-role-name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: #5b9dff;
+}
+
+.gs-role-tier-badge {
+  flex: none;
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.gs-role-detail {
+  padding: 4px 8px 10px;
+}
+
+.gs-role-fields {
+  margin: 0 0 8px;
+}
+
+.gs-role-fields dt {
+  margin: 6px 0 1px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.gs-role-fields dd {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.gs-role-note {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.gs-role-path {
+  margin: 0 0 10px;
+  font-size: 11px;
   color: rgba(255, 255, 255, 0.6);
+}
+
+.gs-role-path-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.gs-role-delegate {
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(91, 157, 255, 0.15);
+  color: #fff;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.gs-role-delegate:hover {
+  background: rgba(91, 157, 255, 0.3);
 }

@@ -1,7 +1,12 @@
 /**
  * Panel shell: two tabs (Commands, Roles) inside the floating view Task 3
- * mounted. Commands is real (CommandsTab); Roles is a placeholder empty
- * state — Task 5 replaces it with the role browser.
+ * mounted. Commands lists 74 studio commands by pipeline phase
+ * (CommandsTab); Roles lists the 49 role briefs by department (RolesTab),
+ * each expandable, each with a button that prefills a delegation prompt
+ * into the composer (never sends it — see index.ts's module doc for why
+ * `ctx.conversation.setDraft` needs both `sessions.scope(id)` and
+ * `conversation.input.for(actx)`, not a bare `ctx.conversation.setDraft`
+ * call).
  *
  * Style delivery follows the brief literally: `panel.css` arrives as a
  * string via esbuild's `text` loader, and this component creates the one
@@ -15,6 +20,7 @@ import type { LocaleRuntime } from "@deepseek-ai/dsh-client-locale/client";
 import { CATALOG } from "./catalog.generated.js";
 import { CommandsTab } from "./CommandsTab.js";
 import { NS } from "./locales.js";
+import { RolesTab } from "./RolesTab.js";
 import panelCss from "./panel.css";
 
 const STYLE_ID = "dsh-game-studio-client-style";
@@ -23,6 +29,7 @@ export interface PanelProps {
   /** The locale service itself (not a pre-bound `t`): lets the panel re-bind on every render, and subscribe to switches. */
   locale: LocaleRuntime;
   onPick: (name: string) => void;
+  onDelegate: (role: string) => void;
 }
 
 type Tab = "commands" | "roles";
@@ -41,7 +48,7 @@ function useInjectedStyle(): void {
   }, []);
 }
 
-export function Panel({ locale, onPick }: PanelProps): JSX.Element {
+export function Panel({ locale, onPick, onDelegate }: PanelProps): JSX.Element {
   useInjectedStyle();
 
   // Re-render on locale switch: `locale.bind(NS)` itself always reads the
@@ -92,10 +99,10 @@ export function Panel({ locale, onPick }: PanelProps): JSX.Element {
             <CommandsTab commands={CATALOG.commands} onPick={onPick} t={t} />
           </>
         ) : (
-          <div className="gs-roles-empty">
-            <p className="gs-roles-empty-title">{t("roles.comingSoon.title")}</p>
-            <p className="gs-roles-empty-body">{t("roles.comingSoon.body", { count: CATALOG.roles.length })}</p>
-          </div>
+          <>
+            <p className="gs-panel-summary">{t("roles.summary", { count: CATALOG.roles.length })}</p>
+            <RolesTab roles={CATALOG.roles} onDelegate={onDelegate} t={t} />
+          </>
         )}
       </div>
     </div>
