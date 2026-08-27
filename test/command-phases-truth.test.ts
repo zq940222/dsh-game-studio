@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { contentDir } from "../src/content.js";
 
@@ -19,7 +19,13 @@ function readMap(): Map<string, string> {
 
 describe("command-phases.md tells the truth", () => {
   const map = readMap();
-  const onDisk = readdirSync(`${contentDir()}skills`).filter((d) => d.startsWith("gs-"));
+  const skillsRoot = `${contentDir()}skills`;
+  // Guard with isDirectory(), not a `gs-` name filter: the filesystem
+  // provider itself only ever discovers <name>/SKILL.md directories, so a
+  // loose file dropped directly under the skills root (content.ts's
+  // "loose-file" problem kind exists to catch exactly that) must not be
+  // silently treated as a command here either.
+  const onDisk = readdirSync(skillsRoot).filter((d) => statSync(`${skillsRoot}/${d}`).isDirectory());
 
   it("parses a non-trivial number of rows", () => {
     expect(map.size).toBeGreaterThan(70);
