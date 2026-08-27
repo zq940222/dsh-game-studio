@@ -21,7 +21,7 @@
     "test": "vitest run",
     "lint:content": "node scripts/lint-content.mjs",
     "check": "pnpm build && pnpm test && pnpm lint:content",
-    "prepack": "pnpm build"
+    "prepare": "pnpm build"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
