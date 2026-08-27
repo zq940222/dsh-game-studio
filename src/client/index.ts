@@ -106,9 +106,13 @@
  *   `dsh-client-ui-conversation` provides the service.
  * - The reference reads the draft before writing it and inserts into it.
  *   The brief's literal `setDraft(prefix)` would silently discard
- *   whatever the user had already typed — `withDelegationPrefix` below
- *   prepends instead (and is idempotent for the same role's prefix, so a
- *   double-click or a re-delegate to the same role doesn't stack it).
+ *   whatever the user had already typed — `withDelegationPrefix`
+ *   (`delegate-prefix.ts`) prepends instead, and replaces any delegation
+ *   prefix already leading the draft rather than stacking a new one on
+ *   top of it, so browsing roles and clicking two or three in a row never
+ *   leaves more than one prefix for the user to hand-clean. See that
+ *   module's own doc comment for the fix history and the one accepted
+ *   false-positive case.
  *
  * Unlike `"conversation"` in the command-dispatch section above (dropped
  * entirely — nothing in that path ever needed it), the delegate path
@@ -153,6 +157,7 @@ import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
 import type {} from "@deepseek-ai/dsh-client-locale/client";
 // Type-only: merges `conversation: IConversation` onto cordis Context (see the module doc's "delegate prefill" section).
 import type {} from "@deepseek-ai/dsh-client-ui-conversation/client";
+import { withDelegationPrefix } from "./delegate-prefix.js";
 import { Panel } from "./Panel.js";
 import { en, NS, zh, type GameStudioKey } from "./locales.js";
 
@@ -318,25 +323,6 @@ function makeOnPick(ctx: ClientContext): (name: string) => void {
         console.error(`[dsh-game-studio] /${name} failed to send`, error);
       });
   };
-}
-
-/**
- * Inserts a delegation prefix into an existing draft rather than
- * overwriting it. A click that silently discarded whatever the user had
- * already typed would be a bug, not a shortcut (see the module doc's
- * "delegate prefill" section). Idempotent for the exact prefix already
- * leading the draft — a double-click, or re-delegating to the same role,
- * does not stack it; delegating to a *different* role after that still
- * prepends its own prefix rather than replacing the first one (the brief
- * does not specify this case; preserving content wins over de-duplicating
- * it).
- * @param draft - the current composer draft.
- * @param prefix - the localized delegation prefix for one role.
- * @returns the next draft to write back with `setDraft`.
- */
-function withDelegationPrefix(draft: string, prefix: string): string {
-  if (draft.startsWith(prefix)) return draft;
-  return draft === "" ? prefix : `${prefix}${draft}`;
 }
 
 /**
