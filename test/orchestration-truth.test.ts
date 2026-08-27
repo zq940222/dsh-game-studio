@@ -32,6 +32,34 @@ import { EXPECTED_COUNTS } from "../tools/port/manifest.mjs";
 // Out of scope, deliberately not chased: spelled-out numbers ("forty-nine
 // role briefs are installed") — this test only looks for digit runs.
 
+// --- The exception workflow -----------------------------------------------
+//
+// `acknowledgedExceptions` (declared inside the test body below) is a
+// hardcoded, reviewed list of digits that sit on a triggering line but are
+// NOT installation-count claims — a phase number, a breakdown of an
+// already-validated total, that sort of thing. Each entry is matched
+// against its EXACT surrounding substring, not the bare digit, so editing
+// the sentence invalidates the exception and the test fails again until
+// someone re-confirms it still applies. That is deliberate: an exception is
+// a decision made once, about one specific sentence, not a standing licence
+// to stop looking at that number.
+//
+// Adding an entry is a conscious act of review, never a shortcut to turn a
+// red test green. Before adding one, check whether the line can instead be
+// reworded to state a real, validatable count, or reworded to drop the
+// digit entirely — see gs-studio.md's directory table for a case where a
+// digit was dropped rather than exempted. Reach for an exception only when
+// the number genuinely is not a count claim.
+//
+// A residual trap this design cannot close: an engine or platform VERSION
+// number ("Godot 4", "UE5", "the .NET 8 runtime") sitting on a
+// trigger-verb line reads, to this regex, exactly like an installation
+// count, and will hard-fail every time. There is no way to tell "ships a
+// Godot 4 project template" apart from "ships 4 project templates" without
+// a noun map — and the whole point of this design is refusing to maintain
+// one. When that happens, the fix is a reviewed `acknowledgedExceptions`
+// entry, not a widened matcher.
+
 describe("orchestration skills tell the truth about what ships", () => {
   const orchDir = `${contentDir()}orchestration/`;
   const files = readdirSync(orchDir).filter((f) => f.endsWith(".md"));
@@ -76,12 +104,20 @@ describe("orchestration skills tell the truth about what ships", () => {
     // entry is matched against its exact surrounding substring, not the
     // bare number, so editing the line invalidates the exception and
     // forces re-confirmation here.
+    //
+    // Structural blind spot, worth stating plainly: an exception exempts
+    // the DIGIT from the sweep below — it does not, and cannot, check
+    // whether the PROSE around that digit is still true. "Phase 2 ships
+    // the full studio" lived in this exact list for a full phase after the
+    // studio outgrew "Phase 2": the exception correctly recognized `2` as
+    // a phase number, not a count, and kept right on recognizing it after
+    // the sentence itself went stale (fixed in the Phase 3 final review —
+    // see gs-studio.md, which no longer needs an entry here because the
+    // rewrite dropped the digit). This list is the one place in this file
+    // where a stale claim can hide from every check the test performs;
+    // passing does not mean the exempted prose is current, only that its
+    // digit was reviewed once.
     const acknowledgedExceptions: Array<{ file: string; substring: string; reason: string }> = [
-      {
-        file: "gs-studio.md",
-        substring: "Phase 2 ships the full studio",
-        reason: "the 2 is a project phase number, not a count of shipped files",
-      },
       {
         file: "gs-studio.md",
         substring: "The 7-phase workflow catalog",
@@ -106,7 +142,21 @@ describe("orchestration skills tell the truth about what ships", () => {
         // has 7 phases", and "a typical raid party has 4 roles" from
         // ever being examined — none of them assert that something is
         // installed/shipped.
-        if (!/\b(installed|installs|ships|ship|shipped|bundles|includes)\b/i.test(line)) {
+        //
+        // `includes` and bare `ship` are deliberately NOT in this set.
+        // Both were speculative additions with no real claim in this
+        // corpus behind them, and both false-gate on ordinary game-dev
+        // prose that says nothing about installation — "Each sprint
+        // includes 3 checkpoints", "Ship the vertical slice by week 6".
+        // `installed`, `installs`, `ships`, and `shipped` already carry
+        // every real installation claim this corpus makes today (verify:
+        // `grep -rniE "\b(installed|installs|ships|shipped)\b"
+        // content/orchestration/`). `bundles` stays even though nothing
+        // currently uses it — it was added for a MEASURED false negative
+        // ("bundles 70 skill packages" passed silently before it was
+        // added), unlike the other two, which were never observed to miss
+        // anything real.
+        if (!/\b(installed|installs|ships|shipped|bundles)\b/i.test(line)) {
           continue;
         }
 
