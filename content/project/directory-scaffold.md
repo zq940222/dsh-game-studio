@@ -2,8 +2,8 @@
 
 `/gs-start` creates this directory tree in the new project workspace —
 this is a checklist of what to create, not a description of a layout
-that already exists. Create all eight, even the ones that start empty;
-later skills and rules assume they are there.
+that already exists. Create every one of them, even the ones that start
+empty; later skills and rules assume they are there.
 
 - `src/` — create for game source code: core, gameplay, ai, networking, ui, tools
 - `assets/` — create for game assets: art, audio, vfx, shaders, data

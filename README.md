@@ -19,7 +19,7 @@ ported as blocking gates. They are checklists, approval prompts, and
 reminders. Nothing here will stop a bad commit — it will only tell you
 about it.
 
-## Current state: Phase 2 — the full studio
+## Current state: Phase 3 — orchestration and workspace scaffolding
 
 This is the full port, not a skeleton. What is installed today:
 
@@ -33,13 +33,17 @@ This is the full port, not a skeleton. What is installed today:
   roster the port produces
 - 40 document templates, 11 path-scoped coding-standard rule files, 46
   per-engine reference docs (Godot / Unity / Unreal), and 13 handbook
-  documents (roster, gates, coordination rules)
+  documents (roster, gates, coordination rules, guards)
 - the 7-phase pipeline guide and catalog under `pipeline/`
+- `content/project/`: the `AGENTS.md` template and directory scaffold
+  `/gs-start` uses to bootstrap a new project workspace — see "Workspace
+  scaffolding" below
 
-`/gs-start` and the `game-designer` role brief are both there today. What
-is still ahead is active pipeline-stage enforcement and the guard /
-model-tier layer — see Configuration below for exactly which keys this
-phase implements.
+`/gs-start` and the `game-designer` role brief are both there today —
+`/gs-start` now does more than route you to the next skill; see "Workspace
+scaffolding" below. What is still ahead is active pipeline-stage
+enforcement and the guard / model-tier layer — see Configuration below for
+exactly which keys this phase implements.
 
 ## Installation
 
@@ -89,6 +93,40 @@ what skills it has available. The answer should mention `gs-studio` and
 catalog, only the `/` menu. Load `gs-studio` next for an orientation to
 what is installed and where.
 
+## Workspace scaffolding: `/gs-start` and `AGENTS.md`
+
+`/gs-start` is a command skill — reachable from the `/` menu, not visible
+to the model, and the harness refuses model invocation of it even if
+asked by name — that onboards a new project. Beyond the upstream
+onboarding questions it inherited (where are you, what should you build
+first), on this harness it also bootstraps the workspace itself:
+
+- **It asks before writing.** It shows the full plan — the directories it
+  will create and the filled-in `{{PROJECT_NAME}}` / `{{ENGINE}}` /
+  `{{CONTENT_DIR}}` values — and waits for approval before touching disk.
+- **It creates a directory tree.** Once approved, it creates the
+  top-level directories listed in `content/project/directory-scaffold.md`
+  (`src/`, `assets/`, `design/`, `docs/`, `tests/`, `tools/`,
+  `prototypes/`, `production/`, and their documented subdirectories) that
+  do not already exist. It never deletes or overwrites an existing
+  directory.
+- **It writes a filled `AGENTS.md`.** It fills
+  `content/project/AGENTS.md.template` — project name, engine, and this
+  installation's own absolute content directory, resolved from the
+  skill's own resource base rather than guessed — and writes the result
+  to the workspace root as `AGENTS.md`. If one already exists, it shows
+  the diff and asks before touching it.
+
+That `AGENTS.md` is not just a file left for you to read later: this
+harness injects it into every session opened in that workspace afterward,
+ahead of the skill catalog, so the project's engine, content path, and
+path-scoped rule table (which rule file governs which kind of edit) are
+available to the model with no per-session setup. This was verified
+live — a fresh session in a scaffolded workspace, with tools and file
+reads disabled, correctly answered questions about the project's engine
+and content path from the injection alone, at a measured cost of roughly
+0.8K tokens per session.
+
 ## Configuration
 
 Override any of these in the profile's own patch file
@@ -105,7 +143,7 @@ id this package's own `cordis.patch.yml` inserts:
 | Key | Type | Default | What it does today |
 |---|---|---|---|
 | `engine` | `"auto" \| "godot" \| "unity" \| "ue5"` | `"auto"` | Substituted into the `gs-studio` orientation skill as the active engine. The per-engine reference handbooks (`content/engines/`) are shipped; automatic selection between them by this value is not wired up yet. |
-| `reviewIntensity` | `"full" \| "lean" \| "solo"` | `"full"` | Substituted into the `gs-studio` orientation skill as the active review intensity. The pipeline stages that will act on it are not shipped yet (Phase 3). |
+| `reviewIntensity` | `"full" \| "lean" \| "solo"` | `"full"` | Substituted into `gs-studio` and all seven `gs-phase-*` pipeline stage skills. Each phase skill uses it to decide how much of its own gate is mandatory — `full` runs every check, `lean` runs the ones marked essential, `solo` runs only the deliverable check (see `gs-pipeline`). |
 | `watch` | `boolean` | `false` | Re-scans `content/skills/` for changes without restarting the harness. The shipped content is immutable — leave this `false` unless you are developing this plugin itself. |
 | `exposeCommandSkillsToModel` | `boolean` | `false` | Opt-in escape hatch. When `true`, all 74 command skills are *also* registered as model-invocable runtime skills, overriding their own `disable-model-invocation: true` frontmatter — on top of, not instead of, the 12 orchestration skills. This is the opposite of this package's default and measured design claim (see "The cost of a shared profile" below); leave it `false` unless you specifically want the model able to invoke studio commands directly. |
 
