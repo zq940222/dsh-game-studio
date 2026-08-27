@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { contentDir } from "../src/content.js";
 import { EXPECTED_COUNTS } from "../tools/port/manifest.mjs";
+import { buildCatalog } from "../tools/catalog/parse.mjs";
 
 // package.json's `description` is prose a human reads in an npm-registry
 // listing; nothing regenerates it from disk, so a stale number ships
@@ -119,6 +120,36 @@ describe("README.md's count claims tell the truth about what ships", () => {
       expect(Number(m[1])).toBe(orchCount);
     }
   });
+
+  // Task 6's "Studio panel" section introduces two counts EXPECTED_COUNTS
+  // does not carry: how many distinct pipeline phases the Commands tab
+  // groups into, and how many distinct departments the Roles tab groups
+  // into. Both are properties of the panel's own catalog data (the same
+  // data build-catalog.mjs emits as catalog.generated.ts), not of the raw
+  // file counts EXPECTED_COUNTS pins — so they are read live off
+  // buildCatalog's output here, the same pattern catalog.test.ts already
+  // uses, rather than hardcoded as bare 7 / 8 constants that could go
+  // stale exactly like the four claims this file's other describe blocks
+  // exist to catch.
+  const catalog = buildCatalog({ rolesDir: `${contentDir()}roles`, skillsDir: `${contentDir()}skills`, phaseMapText: undefined });
+  const livePhaseCount = new Set(catalog.commands.map((c) => c.phase)).size;
+  const liveDepartmentCount = new Set(catalog.roles.map((r) => r.department)).size;
+
+  it('claims the live count of pipeline phases the Commands tab groups into, for every "pipeline phases" mention', () => {
+    const matches = [...readme.matchAll(/(\d+)\s+pipeline phases\b/g)];
+    expect(matches.length, 'README.md does not mention "pipeline phases"').toBeGreaterThan(0);
+    for (const m of matches) {
+      expect(Number(m[1])).toBe(livePhaseCount);
+    }
+  });
+
+  it('claims the live count of departments the Roles tab groups into, for every "departments" mention', () => {
+    const matches = [...readme.matchAll(/(\d+)\s+departments\b/g)];
+    expect(matches.length, 'README.md does not mention "departments"').toBeGreaterThan(0);
+    for (const m of matches) {
+      expect(Number(m[1])).toBe(liveDepartmentCount);
+    }
+  });
 });
 
 // README.zh.md is the fourth surface carrying these installed-count
@@ -172,6 +203,31 @@ describe("README.zh.md's count claims tell the truth about what ships", () => {
     expect(matches.length, 'README.zh.md does not mention "N 个编排技能"').toBeGreaterThan(0);
     for (const m of matches) {
       expect(Number(m[1])).toBe(orchCount);
+    }
+  });
+
+  // Same two panel-catalog counts as README.md's block above, read live
+  // off buildCatalog rather than hardcoded — see that block's comment for
+  // why. README.zh.md phrases them as "N 个流水线阶段" and "N 个部门",
+  // its own natural wording, not a translation of README.md's English
+  // phrases.
+  const catalogZh = buildCatalog({ rolesDir: `${contentDir()}roles`, skillsDir: `${contentDir()}skills`, phaseMapText: undefined });
+  const livePhaseCountZh = new Set(catalogZh.commands.map((c) => c.phase)).size;
+  const liveDepartmentCountZh = new Set(catalogZh.roles.map((r) => r.department)).size;
+
+  it('claims the live count of pipeline phases for every "N 个流水线阶段" mention', () => {
+    const matches = [...readmeZh.matchAll(/(\d+)\s*个流水线阶段/g)];
+    expect(matches.length, 'README.zh.md does not mention "N 个流水线阶段"').toBeGreaterThan(0);
+    for (const m of matches) {
+      expect(Number(m[1])).toBe(livePhaseCountZh);
+    }
+  });
+
+  it('claims the live count of departments for every "N 个部门" mention', () => {
+    const matches = [...readmeZh.matchAll(/(\d+)\s*个部门/g)];
+    expect(matches.length, 'README.zh.md does not mention "N 个部门"').toBeGreaterThan(0);
+    for (const m of matches) {
+      expect(Number(m[1])).toBe(liveDepartmentCountZh);
     }
   });
 });

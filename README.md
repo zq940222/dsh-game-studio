@@ -110,6 +110,32 @@ what skills it has available. The answer should mention `gs-studio` and
 catalog, only the `/` menu. Load `gs-studio` next for an orientation to
 what is installed and where.
 
+## Studio panel
+
+Installing this plugin also adds a **Game Studio** entry to the sidebar of
+any profile running `dsh web`. Clicking it opens a floating panel with two
+tabs:
+
+- **Commands** — all 74 command skills, grouped into 7 pipeline phases
+  (Concept, Design, Architecture, Sprint, QA, Polish, Release). Clicking a
+  row runs that command immediately, in the current session — the same
+  effect as typing `/name` yourself. There is no confirmation step.
+- **Roles** — all 49 role briefs, grouped into 8 departments. Clicking a
+  card expands it to show its five frontmatter fields (role, description,
+  department, tier, suggested model tier) and its brief's content-relative
+  path. The card's **Delegate task** button only **prefills** the
+  composer's draft with a delegation prompt for that role — inserted
+  ahead of anything you already typed, never sent for you. You still
+  review it and press send yourself.
+
+The sidebar entry is a plain DOM node inserted into the host shell's own
+rendered sidebar markup — there is no plugin slot API for it (yet) — so it
+self-heals across most of the shell's own re-renders, but it is watching
+that markup's current shape, not a stable contract. A host restyle that
+changes the sidebar's structure enough could make it stop finding
+anywhere to mount, and the entry would silently disappear until a future
+release of this package catches up to the new structure.
+
 ## Workspace scaffolding: `/gs-start` and `AGENTS.md`
 
 `/gs-start` is a command skill — reachable from the `/` menu, not visible
