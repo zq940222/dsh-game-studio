@@ -43,7 +43,7 @@ agent/skill/hook/rule 扩展点之上。本包把那个项目的形态重新表�
 本包没有发布到 npm registry。从 GitHub release 附带的 tarball 安装：
 
 ```bash
-dsh plugin --profile web add https://github.com/zq940222/dsh-game-studio/releases/download/v0.1.0/dsh-game-studio-0.1.0.tgz
+dsh plugin --profile web add https://github.com/zq940222/dsh-game-studio/releases/download/v0.2.0/dsh-game-studio-0.2.0.tgz
 dsh web
 ```
 
@@ -69,7 +69,7 @@ dsh web
 ### 路线二：单独的隔离 profile
 
 ```bash
-dsh plugin --profile game-studio add https://github.com/zq940222/dsh-game-studio/releases/download/v0.1.0/dsh-game-studio-0.1.0.tgz
+dsh plugin --profile game-studio add https://github.com/zq940222/dsh-game-studio/releases/download/v0.2.0/dsh-game-studio-0.2.0.tgz
 ```
 
 这条命令会新建一个 profile。一个刚创建的 profile 的 `dsh.profile.bundles`
