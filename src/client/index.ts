@@ -191,6 +191,22 @@ export const inject: string[] = ["sessions", "locale", "conversation"];
 const ENTRY_ATTR = "data-dsh-game-studio-entry";
 
 /**
+ * Inline icon for the sidebar entry — a minimal gamepad silhouette (rounded
+ * body, d-pad, one face button) on the same `0 0 16 16` viewBox, 14×14,
+ * `stroke="currentColor"` shape the host's own plugin entries (task board,
+ * SSH) use for theirs, captured verbatim from the live DOM. Static markup
+ * (no interpolated data), so `innerHTML` is safe here; the label text next
+ * to it is always set via `textContent` instead — see `mountSidebarEntry`.
+ */
+const ENTRY_ICON_SVG =
+  '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" ' +
+  'stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<rect x="1.5" y="5.5" width="13" height="6" rx="3"></rect>' +
+  '<path d="M4.6 7.6v1.8M3.7 8.5h1.8"></path>' +
+  '<circle cx="11.2" cy="8.5" r="0.75" fill="currentColor" stroke="none"></circle>' +
+  "</svg>";
+
+/**
  * Locates the sidebar's DOM root. Same two-selector fallback and
  * logo-row heuristic as the reference `sidebar-entry.ts`'s `sidebarRoot`:
  * `[data-pane="sidebar"]` on current shells, a `sidebarCol`-ish class on
@@ -205,6 +221,41 @@ function sidebarRoot(): HTMLElement | undefined {
   if (column === null) return undefined;
   const logoOwner = column.querySelector<HTMLElement>('[class*="logoRow"]')?.parentElement;
   return logoOwner ?? (column.firstElementChild as HTMLElement | null) ?? undefined;
+}
+
+/**
+ * Places the entry where it belongs relative to the sidebar root: after the
+ * "new session" row and before the plugin-region divider, which is where
+ * the host's own plugin entries (task board, SSH) already sit — measured on
+ * the live DOM. `place()` used to `insertBefore(entry, root.firstChild)`,
+ * which landed the entry above the product logo instead; that was defect 1
+ * of the v0.2.0 invisible-entry bug (see `mountSidebarEntry`'s doc comment).
+ *
+ * Same local-name-fragment idiom `sidebarRoot()` already uses for hashed
+ * CSS-module classes: `[class*="regionArea"]` is the divider itself,
+ * `[class*="newSession"]` is the fallback anchor if a restyle ever drops
+ * `regionArea`. Insertion always goes through the matched anchor's own
+ * `parentNode` — not assumed to be `root` — since `querySelector` searches
+ * the whole subtree and `Node.insertBefore` throws `NotFoundError` if the
+ * reference node isn't a direct child of the node it's called on. If
+ * neither anchor matches, `root.appendChild` is the last resort — still far
+ * safer than the old before-firstChild placement, which was guaranteed
+ * wrong (above the logo).
+ * @param root - the sidebar root returned by `sidebarRoot()`.
+ * @param entry - the entry button to place.
+ */
+function placeInSidebar(root: HTMLElement, entry: HTMLElement): void {
+  const region = root.querySelector<HTMLElement>('[class*="regionArea"]');
+  if (region !== null && region.parentNode !== null) {
+    region.parentNode.insertBefore(entry, region);
+    return;
+  }
+  const newSession = root.querySelector<HTMLElement>('[class*="newSession"]');
+  if (newSession !== null && newSession.parentNode !== null) {
+    newSession.parentNode.insertBefore(entry, newSession.nextSibling);
+    return;
+  }
+  root.appendChild(entry);
 }
 
 /**
@@ -225,7 +276,23 @@ function sidebarRoot(): HTMLElement | undefined {
  * `offsetParent`/`getBoundingClientRect` and warned once, same one-shot
  * pattern as the not-found case. This only makes the failure visible; it
  * does not attempt recovery.
- * @param label - translated entry button text.
+ *
+ * v0.2.0 shipped two further, independent ways for an inserted-and-visible
+ * entry to still be invisible to a real user, both confirmed with direct
+ * DOM measurement against a live shell and fixed here:
+ *
+ * - Defect 1 (position): the entry landed above the product logo instead of
+ *   with the other plugin entries. Fixed by anchoring on
+ *   `placeInSidebar()` instead of `root.firstChild`.
+ * - Defect 2 (collapsed rail, no icon): the sidebar can be collapsed to a
+ *   ~35px icon rail, where only an icon renders — a text-only entry has
+ *   nothing to show, and (per the measurement) its whole-word text wrapped
+ *   into a multi-line smear cut off by the rail's width. Fixed by giving
+ *   the entry an icon span (`ENTRY_ICON_SVG`) ahead of a `nowrap` label
+ *   span (`.gs-entry-label` in panel.css), matching the peers' own
+ *   icon-span + label-span structure, plus `aria-label` so the accessible
+ *   name survives even when the label itself is clipped away.
+ * @param label - translated entry button text (also used as `aria-label`).
  * @param onToggle - called on every click.
  * @returns disposer removing the entry and its observer.
  */
@@ -234,7 +301,18 @@ function mountSidebarEntry(label: string, onToggle: () => void): () => void {
   entry.type = "button";
   entry.setAttribute(ENTRY_ATTR, "");
   entry.className = "gs-entry";
-  entry.textContent = label;
+  entry.setAttribute("aria-label", label);
+
+  const icon = document.createElement("span");
+  icon.className = "gs-entry-icon";
+  icon.innerHTML = ENTRY_ICON_SVG;
+  entry.appendChild(icon);
+
+  const labelEl = document.createElement("span");
+  labelEl.className = "gs-entry-label";
+  labelEl.textContent = label;
+  entry.appendChild(labelEl);
+
   entry.addEventListener("click", onToggle);
 
   let warned = false;
@@ -255,7 +333,7 @@ function mountSidebarEntry(label: string, onToggle: () => void): () => void {
       return;
     }
     warned = false;
-    root.insertBefore(entry, root.firstChild);
+    placeInSidebar(root, entry);
     if (!warnedInvisible && (entry.offsetParent === null || entry.getBoundingClientRect().height === 0)) {
       warnedInvisible = true;
       console.warn(

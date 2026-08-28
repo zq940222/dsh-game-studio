@@ -7,8 +7,17 @@
  * out of the host shell's own (hashed) class names.
  */
 
+/*
+ * `overflow: hidden` matters when the host sidebar is collapsed to its
+ * ~35px icon rail: the rail narrows `.gs-entry`'s box but does not touch
+ * its content, so without this the nowrap label below would render past
+ * the rail's edge instead of being cropped away like the host's own
+ * (icon-only, in that state) plugin entries.
+ */
 .gs-entry {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   padding: 8px 12px;
   border: none;
@@ -17,10 +26,28 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+  overflow: hidden;
 }
 
 .gs-entry:hover {
   background: rgba(127, 127, 127, 0.15);
+}
+
+.gs-entry-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+}
+
+/* nowrap: without it, a label clipped by the collapsed rail's width wraps
+   onto multiple lines instead of being cropped on one — see the module
+   doc's "Defect 2" note in index.ts. */
+.gs-entry-label {
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .gs-panel {
