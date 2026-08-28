@@ -67,4 +67,21 @@ describe("buildCatalog over the real shipped content", () => {
     const role = catalog.roles.find((r) => r.role === "gameplay-programmer");
     expect(role?.briefPath).toBe("roles/gameplay-programmer.md");
   });
+
+  // RolesTab.tsx's toDepartmentGroups and CommandsTab.tsx's toPhaseGroups
+  // both start a new group only when the key changes from the previous
+  // element — correct only because these sorts (above) keep same-key rows
+  // contiguous. A comparator change that broke contiguity would silently
+  // render duplicate group headers instead of failing loudly, so this
+  // guards the property those two components actually depend on: the
+  // number of contiguous runs must equal the number of distinct keys.
+  it("keeps roles department-contiguous, which RolesTab's grouping depends on", () => {
+    const runs = catalog.roles.filter((r, i) => i === 0 || r.department !== catalog.roles[i - 1]!.department).length;
+    expect(runs).toBe(new Set(catalog.roles.map((r) => r.department)).size);
+  });
+
+  it("keeps commands phase-contiguous, which CommandsTab's grouping depends on", () => {
+    const runs = catalog.commands.filter((c, i) => i === 0 || c.phase !== catalog.commands[i - 1]!.phase).length;
+    expect(runs).toBe(new Set(catalog.commands.map((c) => c.phase)).size);
+  });
 });

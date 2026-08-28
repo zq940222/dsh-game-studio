@@ -215,6 +215,16 @@ function sidebarRoot(): HTMLElement | undefined {
  * restyle can silently stop matching. Where Task 3 failed silently, this
  * logs once instead — a small, welcome visibility improvement, not a fix
  * for the fragility itself.
+ *
+ * A second failure mode gets the same treatment: the selector can keep
+ * matching but land on the wrong element (a restyle that makes
+ * `[class*="sidebarCol"]` hit something else). `insertBefore` then
+ * succeeds, so `document.body.contains(entry)` is true forever and the
+ * not-found branch above never fires again — the entry silently renders
+ * nowhere the user can see it. Right after insertion this is checked with
+ * `offsetParent`/`getBoundingClientRect` and warned once, same one-shot
+ * pattern as the not-found case. This only makes the failure visible; it
+ * does not attempt recovery.
  * @param label - translated entry button text.
  * @param onToggle - called on every click.
  * @returns disposer removing the entry and its observer.
@@ -228,6 +238,7 @@ function mountSidebarEntry(label: string, onToggle: () => void): () => void {
   entry.addEventListener("click", onToggle);
 
   let warned = false;
+  let warnedInvisible = false;
   const place = (): void => {
     if (document.body.contains(entry)) return;
     const root = sidebarRoot();
@@ -245,6 +256,15 @@ function mountSidebarEntry(label: string, onToggle: () => void): () => void {
     }
     warned = false;
     root.insertBefore(entry, root.firstChild);
+    if (!warnedInvisible && (entry.offsetParent === null || entry.getBoundingClientRect().height === 0)) {
+      warnedInvisible = true;
+      console.warn(
+        "[dsh-game-studio] sidebar entry was inserted but is not visible " +
+          "(offsetParent is null or height is 0) — sidebarRoot() likely matched " +
+          "the wrong element after a host restyle. The button exists in the DOM " +
+          "but the user cannot see or click it; see mountSidebarEntry()'s doc comment.",
+      );
+    }
   };
 
   const observer = new MutationObserver(place);
