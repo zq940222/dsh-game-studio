@@ -12,8 +12,16 @@
  * end up inlined into the factory closure; only names the host's require
  * shim can resolve on its own (`react`, its subpaths, and every
  * `@deepseek-ai/dsh-client-*` package) may cross the factory boundary as
- * `require(...)` calls. `pnpm build`'s Step 5 check greps the output for
- * exactly that.
+ * `require(...)` calls. There is no "Step 5" grep stage in `pnpm build`
+ * itself — `scripts.build` is four stages (catalog generate, two `tsc`
+ * invocations, this esbuild step) and none of them checks the output;
+ * "Step 5" was a one-time manual check from a task brief, never
+ * automated. The real guard is `test/client-bundle-truth.test.ts`: it
+ * reads `lib/client.js` after a build and asserts the wrapper shape plus
+ * the exact set of externals that made it through (today: `react`,
+ * `react/jsx-runtime`, `react-dom/client`, and zero `@deepseek-ai/*`). It
+ * skips cleanly when `lib/` hasn't been built yet, so `pnpm vitest run`
+ * stays runnable on a clean checkout.
  *
  * The wrapper shape below is copied from the reference package's own
  * built output (`@linxin666/dsh-client-ui-task-board`'s `lib/client.js`),
