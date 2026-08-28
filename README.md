@@ -51,7 +51,7 @@ This package is not on the npm registry. Install it from the release
 tarball attached to its GitHub release:
 
 ```bash
-dsh plugin --profile web add https://github.com/zq940222/dsh-game-studio/releases/download/v0.2.0/dsh-game-studio-0.2.0.tgz
+dsh plugin --profile web add https://github.com/zq940222/dsh-game-studio/releases/download/v0.2.1/dsh-game-studio-0.2.1.tgz
 dsh web
 ```
 
@@ -81,7 +81,7 @@ of `package.json` required.
 ### Route 2: a dedicated, isolated profile
 
 ```bash
-dsh plugin --profile game-studio add https://github.com/zq940222/dsh-game-studio/releases/download/v0.2.0/dsh-game-studio-0.2.0.tgz
+dsh plugin --profile game-studio add https://github.com/zq940222/dsh-game-studio/releases/download/v0.2.1/dsh-game-studio-0.2.1.tgz
 ```
 
 This creates a brand-new profile. A freshly created profile is seeded with

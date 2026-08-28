@@ -1,6 +1,6 @@
 {
   "name": "dsh-game-studio",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A game studio for DeepSeek Harness: a full port of Claude-Code-Game-Studios' 49-role, 74-command (73 studio commands + gs-ping probe), 7-phase studio (skill provider, 12 orchestration skills, 74 command skills, 49 role briefs, 40 templates, 11 rules, 46 engine docs, 13 handbook docs)",
   "keywords": [
     "dsh-plugin",
